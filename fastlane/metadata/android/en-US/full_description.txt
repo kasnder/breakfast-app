@@ -1,0 +1,7 @@
+<p><i>Breakfast</i> is an Android app for a lightweight morning check-in. It brings together weather for your configured city, a small set of top stories from your RSS or Atom feeds, and a social-media break timer backed by an accessibility service.</p>
+
+<p>The main screen is designed as a glanceable morning dashboard. Breakfast can show current weather conditions, temperature, humidity, wind, hourly rain forecast, and news from the feeds you choose. If AI is configured, it can also rank and summarize fetched articles for you.</p>
+
+<p>Breakfast also includes personalized home-screen modules such as optional email and calendar note cards, local caching for weather and article data, in-app article opening with Chrome Custom Tabs, and a scheduled morning refresh with a notification when your dashboard is ready.</p>
+
+<p>Settings let you configure your city, feeds, timer duration, friction gate, and AI options. Breakfast stores settings and cached content locally on-device and only makes network requests for the features you enable.</p>

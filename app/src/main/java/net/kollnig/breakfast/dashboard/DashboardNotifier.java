@@ -1,0 +1,67 @@
+package net.kollnig.breakfast.dashboard;
+
+import net.kollnig.breakfast.*;
+import net.kollnig.breakfast.calendar.*;
+import net.kollnig.breakfast.dashboard.*;
+import net.kollnig.breakfast.news.*;
+import net.kollnig.breakfast.social.*;
+import net.kollnig.breakfast.todoist.*;
+import net.kollnig.breakfast.weather.*;
+
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.content.Context;
+import android.content.Intent;
+import android.os.Build;
+
+import androidx.core.app.NotificationCompat;
+
+public class DashboardNotifier {
+    private static final String CHANNEL_ID = "breakfast_dashboard";
+    private static final int NOTIFICATION_ID = 2001;
+
+    private final Context context;
+    private final NotificationManager notificationManager;
+
+    public DashboardNotifier(Context context) {
+        this.context = context;
+        this.notificationManager =
+                (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+        createChannel();
+    }
+
+    private void createChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(
+                    CHANNEL_ID,
+                    context.getString(R.string.dashboard_notification_channel_name),
+                    NotificationManager.IMPORTANCE_DEFAULT
+            );
+            channel.setDescription(context.getString(R.string.dashboard_notification_channel_description));
+            notificationManager.createNotificationChannel(channel);
+        }
+    }
+
+    public void showReadyNotification(String summaryText) {
+        Intent intent = new Intent(context, MainActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        PendingIntent pendingIntent = PendingIntent.getActivity(
+                context,
+                0,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+        );
+
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_settings)
+                .setContentTitle("Breakfast is ready")
+                .setContentText(summaryText)
+                .setStyle(new NotificationCompat.BigTextStyle().bigText(summaryText))
+                .setAutoCancel(true)
+                .setContentIntent(pendingIntent)
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT);
+
+        notificationManager.notify(NOTIFICATION_ID, builder.build());
+    }
+}

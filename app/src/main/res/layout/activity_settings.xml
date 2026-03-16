@@ -1,0 +1,488 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/main"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fitsSystemWindows="false"
+    android:background="@color/background_main">
+
+    <com.google.android.material.appbar.AppBarLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            android:background="@color/header_bg"
+            android:elevation="4dp"
+            app:title="@string/settings_title"
+            app:titleTextAppearance="@style/ToolbarTitleText"
+            app:popupTheme="@style/ThemeOverlay.AppCompat.Light"
+            android:theme="@style/ToolbarTheme" />
+
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Home Screen Modules"
+                android:textAppearance="?attr/textAppearanceTitleSmall"
+                android:textColor="@color/primary_blue"
+                android:textStyle="bold"
+                android:layout_marginBottom="8dp" />
+
+            <TextView
+                android:id="@+id/text_social_module_lock_hint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Unlock social app settings before turning this module off."
+                android:textAppearance="?attr/textAppearanceBodySmall"
+                android:textColor="@color/text_light"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="8dp"
+                android:visibility="gone" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/module_order_hint"
+                android:textAppearance="?attr/textAppearanceBodySmall"
+                android:textColor="@color/text_light"
+                android:layout_marginBottom="8dp" />
+
+            <LinearLayout
+                android:id="@+id/module_order_container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginBottom="24dp" />
+
+            <!-- Weather Section -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Weather"
+                android:textAppearance="?attr/textAppearanceTitleSmall"
+                android:textColor="@color/primary_blue"
+                android:textStyle="bold"
+                android:layout_marginBottom="8dp" />
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="City name"
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                android:layout_marginBottom="24dp">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/input_city"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="text"
+                    android:imeOptions="actionDone" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- Calendar Section -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Calendar"
+                android:textAppearance="?attr/textAppearanceTitleSmall"
+                android:textColor="@color/primary_blue"
+                android:textStyle="bold"
+                android:layout_marginBottom="8dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Choose which device calendars should appear in your morning overview."
+                android:textAppearance="?attr/textAppearanceBodySmall"
+                android:textColor="@color/text_light"
+                android:layout_marginBottom="4dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="If you use Google Calendar, enable 'Share Google Calendar data with other apps' in Google Calendar settings first."
+                android:textAppearance="?attr/textAppearanceBodySmall"
+                android:textColor="@color/text_light"
+                android:layout_marginBottom="8dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_grant_calendar_access"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Grant Calendar Access"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                app:cornerRadius="12dp"
+                android:layout_marginBottom="8dp" />
+
+            <TextView
+                android:id="@+id/calendar_permission_status"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textAppearance="?attr/textAppearanceBodySmall"
+                android:textColor="@color/text_light"
+                android:layout_marginBottom="8dp" />
+
+            <LinearLayout
+                android:id="@+id/calendar_list_container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginBottom="24dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Todoist"
+                android:textAppearance="?attr/textAppearanceTitleSmall"
+                android:textColor="@color/primary_blue"
+                android:textStyle="bold"
+                android:layout_marginBottom="4dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Connect one Todoist project by entering your personal API token and the project ID you want to show on the dashboard."
+                android:textAppearance="?attr/textAppearanceBodySmall"
+                android:textColor="@color/text_light"
+                android:layout_marginBottom="12dp" />
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Todoist API token"
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                app:endIconMode="password_toggle"
+                android:layout_marginBottom="8dp">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/input_todoist_key"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="textPassword" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Todoist project ID"
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                android:layout_marginBottom="24dp">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/input_todoist_project_id"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="text"
+                    android:imeOptions="actionDone" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- Social Media Break Section -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Social App Limits"
+                android:textAppearance="?attr/textAppearanceTitleSmall"
+                android:textColor="@color/primary_blue"
+                android:textStyle="bold"
+                android:layout_marginBottom="8dp" />
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Full-access window (minutes, 1-120)"
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                android:layout_marginBottom="12dp">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/input_timer_duration"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="number"
+                    android:imeOptions="actionDone" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/layout_friction_words"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Friction to change settings (words, 0-50; 0 = off)"
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                android:layout_marginBottom="12dp">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/input_friction_words"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="number"
+                    android:imeOptions="actionDone" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_unlock_social"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Unlock settings"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_marginBottom="12dp"
+                android:visibility="gone" />
+
+            <CheckBox
+                android:id="@+id/checkbox_social_instagram"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Limit Instagram after the timer ends"
+                android:layout_marginBottom="4dp" />
+
+            <CheckBox
+                android:id="@+id/checkbox_social_linkedin"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Limit LinkedIn after the timer ends"
+                android:layout_marginBottom="24dp" />
+
+            <!-- RSS / Atom Feeds Section -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Feed Sources"
+                android:textAppearance="?attr/textAppearanceTitleSmall"
+                android:textColor="@color/primary_blue"
+                android:textStyle="bold"
+                android:layout_marginBottom="8dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Choose built-in sources like Financial Times or BBC, or add a custom RSS or Atom URL. Each feed can go into your latest list, your AI briefing, or both."
+                android:textAppearance="?attr/textAppearanceBodySmall"
+                android:textColor="@color/text_light"
+                android:layout_marginBottom="8dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_morning_refresh_time"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Morning refresh time"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                app:cornerRadius="12dp"
+                android:layout_marginBottom="8dp" />
+
+            <TextView
+                android:id="@+id/text_morning_refresh_time"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textAppearance="?attr/textAppearanceBodySmall"
+                android:textColor="@color/text_light"
+                android:layout_marginBottom="8dp" />
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/switch_morning_delivery"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Send a morning notification"
+                android:layout_marginBottom="8dp" />
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/switch_news_refresh_on_open"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Refresh latest list when the app opens"
+                android:layout_marginBottom="4dp" />
+
+            <TextView
+                android:id="@+id/text_news_refresh_mode"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Default: keep a quiet morning snapshot in the background. If you turn this on, opening the app refreshes only the latest-feed list."
+                android:textAppearance="?attr/textAppearanceBodySmall"
+                android:textColor="@color/text_light"
+                android:layout_marginBottom="8dp" />
+
+            <LinearLayout
+                android:id="@+id/rss_feeds_container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_add_feed"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Add Feed Source"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                app:cornerRadius="12dp"
+                android:layout_marginBottom="12dp" />
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Number of articles to show (1-20)"
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                android:layout_marginBottom="24dp">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/input_article_count"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="number"
+                    android:imeOptions="actionDone" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- LLM Configuration Section -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="AI Briefing"
+                android:textAppearance="?attr/textAppearanceTitleSmall"
+                android:textColor="@color/primary_blue"
+                android:textStyle="bold"
+                android:layout_marginBottom="4dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Connect to any OpenAI-compatible API to rank and summarize recent articles from the feeds you mark for the AI briefing."
+                android:textAppearance="?attr/textAppearanceBodySmall"
+                android:textColor="@color/text_light"
+                android:layout_marginBottom="12dp" />
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/switch_briefing_openai_tts"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Use OpenAI voice for the briefing"
+                android:layout_marginBottom="4dp" />
+
+            <TextView
+                android:id="@+id/text_briefing_openai_tts"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="If this is off, Breakfast reads the briefing with Android's on-device voice."
+                android:textAppearance="?attr/textAppearanceBodySmall"
+                android:textColor="@color/text_light"
+                android:layout_marginBottom="12dp" />
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="API base URL"
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                android:layout_marginBottom="8dp">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/input_llm_url"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="textUri" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="API key"
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                app:endIconMode="password_toggle"
+                android:layout_marginBottom="8dp">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/input_llm_key"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="textPassword" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Model name"
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                android:layout_marginBottom="24dp">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/input_llm_model"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="text" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- Interest Profile Section -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Your Interests"
+                android:textAppearance="?attr/textAppearanceTitleSmall"
+                android:textColor="@color/primary_blue"
+                android:textStyle="bold"
+                android:layout_marginBottom="4dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Describe what topics interest you. The AI briefing uses this to choose which articles from its selected feeds matter most to you."
+                android:textAppearance="?attr/textAppearanceBodySmall"
+                android:textColor="@color/text_light"
+                android:layout_marginBottom="12dp" />
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="e.g. Technology, AI research, European politics, climate science..."
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                android:layout_marginBottom="24dp">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/input_interests"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="textMultiLine"
+                    android:minLines="3"
+                    android:gravity="top" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- Accessibility Service Section -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Social App Blocker"
+                android:textAppearance="?attr/textAppearanceTitleSmall"
+                android:textColor="@color/primary_blue"
+                android:textStyle="bold"
+                android:layout_marginBottom="4dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="The accessibility service limits Instagram and LinkedIn after your timer ends so messages stay reachable while distracting sections are hidden."
+                android:textAppearance="?attr/textAppearanceBodySmall"
+                android:textColor="@color/text_light"
+                android:layout_marginBottom="12dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_accessibility"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Open Accessibility Settings"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                app:cornerRadius="12dp"
+                android:layout_marginBottom="24dp" />
+
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

@@ -1,0 +1,28 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="sky" x1="256" y1="0" x2="256" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#69B7E8"/>
+      <stop offset="0.58" stop-color="#F7C67A"/>
+      <stop offset="1" stop-color="#E86A3C"/>
+    </linearGradient>
+    <linearGradient id="sun" x1="256" y1="116" x2="256" y2="340" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFF7B8"/>
+      <stop offset="1" stop-color="#FFC83D"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" fill="url(#sky)"/>
+
+  <g fill="#FFE28A">
+    <rect x="244" y="34" width="24" height="66" rx="12"/>
+    <rect x="354" y="80" width="24" height="66" rx="12" transform="rotate(45 366 113)"/>
+    <rect x="134" y="80" width="24" height="66" rx="12" transform="rotate(-45 146 113)"/>
+    <rect x="400" y="220" width="24" height="66" rx="12" transform="rotate(90 412 253)"/>
+    <rect x="88" y="220" width="24" height="66" rx="12" transform="rotate(90 100 253)"/>
+  </g>
+
+  <circle cx="256" cy="232" r="110" fill="url(#sun)"/>
+
+  <path d="M0 334C45 320 91 313 138 313C184 313 226 322 266 340C306 357 348 366 391 366C433 366 473 359 512 346V512H0V334Z" fill="#C94F2A"/>
+  <path d="M0 384C52 369 104 362 156 362C210 362 260 372 307 392C353 411 405 421 462 421C479 421 496 420 512 418V512H0V384Z" fill="#8B3524"/>
+</svg>

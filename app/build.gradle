@@ -1,36 +1,47 @@
-apply plugin: 'com.android.application'
+plugins {
+    id 'com.android.application'
+}
 
 android {
-    compileSdkVersion 24
-    buildToolsVersion '24.0.0'
+    namespace 'net.kollnig.breakfast'
+    compileSdk = 36
+
     defaultConfig {
-        applicationId "de.kollnig.breakfast"
-        minSdkVersion 15
-        targetSdkVersion 24
-        versionCode 1
-        versionName "1.0"
+        applicationId "net.kollnig.breakfast"
+        minSdk 24
+        targetSdk 36
+        versionCode 26031601
+        versionName "1.0.0"
     }
+
     buildTypes {
         release {
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_7
-        targetCompatibility JavaVersion.VERSION_1_7
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
     }
-    productFlavors {
+    dependenciesInfo {
+        includeInApk = false
     }
-
-    useLibrary  'org.apache.http.legacy'
 }
 
 dependencies {
-    compile fileTree(include: ['*.jar'], dir: 'libs')
-    compile 'com.android.support:support-v4:24.0.0'
-    compile 'com.github.dexafree:materiallist:2.5.0'
-    compile 'com.nostra13.universalimageloader:universal-image-loader:1.9.4'
-    compile 'jp.wasabeef:recyclerview-animators:1.2.1'
-    compile 'com.pnikosis:materialish-progress:1.5'
+    implementation 'androidx.appcompat:appcompat:1.7.1'
+    implementation 'androidx.browser:browser:1.8.0'
+    implementation 'com.google.android.material:material:1.13.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.2.1'
+    implementation 'androidx.activity:activity:1.13.0'
+    implementation 'androidx.core:core:1.18.0'
+    implementation 'androidx.work:work-runtime:2.10.1'
+    implementation project(':distractionlib')
+
+    // Networking
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+
+    // JSON parsing
+    implementation 'com.google.code.gson:gson:2.11.0'
 }
