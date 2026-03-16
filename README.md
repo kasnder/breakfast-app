@@ -1,4 +1,4 @@
-# Breakfast for Android
+# Breakfast! AI
 
 Breakfast is an Android app for a calmer morning dashboard. It brings together a few focused cards on one screen:
 
