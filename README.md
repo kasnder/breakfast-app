@@ -93,7 +93,7 @@ Example:
 ```bash
 git clone <this-repo>
 git clone https://github.com/kasnder/redd-focus-android ../GreaseMilkyway
-cd Breakfast2
+cd breakfast-app
 ./gradlew assembleDebug
 ```
 
