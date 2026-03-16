@@ -13,6 +13,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.graphics.drawable.GradientDrawable;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
@@ -24,6 +25,7 @@ import android.view.WindowInsetsController;
 import android.widget.CheckBox;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
@@ -49,8 +51,13 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Calendar;
 import java.util.HashMap;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.Locale;
 import java.util.Map;
+import java.nio.charset.StandardCharsets;
 
 public class SettingsActivity extends AppCompatActivity {
     private static final List<FeedPreset> FEED_PRESETS = buildFeedPresets();
@@ -102,6 +109,12 @@ public class SettingsActivity extends AppCompatActivity {
                     refreshSocialSettingsLock();
                 }
             });
+
+    private final ActivityResultLauncher<String> exportSettingsLauncher =
+            registerForActivityResult(new ActivityResultContracts.CreateDocument("application/json"), this::exportSettingsToUri);
+
+    private final ActivityResultLauncher<String[]> importSettingsLauncher =
+            registerForActivityResult(new ActivityResultContracts.OpenDocument(), this::importSettingsFromUri);
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -162,6 +175,12 @@ public class SettingsActivity extends AppCompatActivity {
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             startActivity(intent);
         });
+
+        findViewById(R.id.btn_export_settings).setOnClickListener(v -> {
+            saveAllSettings();
+            exportSettingsLauncher.launch(buildSettingsExportFileName());
+        });
+        findViewById(R.id.btn_import_settings).setOnClickListener(v -> showImportSettingsConfirmation());
 
         btnGrantCalendarAccess.setOnClickListener(v ->
                 calendarPermissionLauncher.launch(Manifest.permission.READ_CALENDAR));
@@ -643,6 +662,72 @@ public class SettingsActivity extends AppCompatActivity {
         if (service != null) {
             service.refreshBlockState();
         }
+    }
+
+    private String buildSettingsExportFileName() {
+        Calendar now = Calendar.getInstance();
+        return String.format(
+                Locale.US,
+                "breakfast-settings-%1$tY%1$tm%1$td.json",
+                now
+        );
+    }
+
+    private void exportSettingsToUri(Uri uri) {
+        if (uri == null) {
+            return;
+        }
+
+        try (OutputStream outputStream = getContentResolver().openOutputStream(uri)) {
+            if (outputStream == null) {
+                throw new IOException("Unable to open export destination");
+            }
+            outputStream.write(config.exportSettingsJson().getBytes(StandardCharsets.UTF_8));
+            outputStream.flush();
+            Toast.makeText(this, "Settings exported.", Toast.LENGTH_SHORT).show();
+        } catch (IOException exception) {
+            Toast.makeText(this, "Could not export settings.", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void showImportSettingsConfirmation() {
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.settings_import_title)
+                .setMessage("Importing replaces your current Breakfast settings with the contents of a backup file.")
+                .setPositiveButton("Import", (dialog, which) ->
+                        importSettingsLauncher.launch(new String[]{"application/json", "text/plain", "*/*"}))
+                .setNegativeButton(R.string.cancel, null)
+                .show();
+    }
+
+    private void importSettingsFromUri(Uri uri) {
+        if (uri == null) {
+            return;
+        }
+
+        try (InputStream inputStream = getContentResolver().openInputStream(uri)) {
+            if (inputStream == null) {
+                throw new IOException("Unable to open import source");
+            }
+
+            config.importSettingsJson(readAllText(inputStream));
+            loadSettings();
+            refreshSocialBlockingState();
+            DashboardScheduler.scheduleMorningRefresh(this);
+            Toast.makeText(this, "Settings imported.", Toast.LENGTH_SHORT).show();
+        } catch (IOException | IllegalArgumentException exception) {
+            Toast.makeText(this, "Could not import that settings file.", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private String readAllText(InputStream inputStream) throws IOException {
+        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        byte[] chunk = new byte[4096];
+        int read;
+        while ((read = inputStream.read(chunk)) != -1) {
+            buffer.write(chunk, 0, read);
+        }
+        return buffer.toString(StandardCharsets.UTF_8.name());
     }
 
     // --- Utilities ---

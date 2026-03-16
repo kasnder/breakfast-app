@@ -11,6 +11,10 @@ import android.content.Context;
 import android.content.SharedPreferences;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParseException;
 import com.google.gson.JsonSyntaxException;
 import com.google.gson.reflect.TypeToken;
 
@@ -24,6 +28,7 @@ import java.util.List;
  * Manages all configuration for the Breakfast app via SharedPreferences.
  */
 public class AppConfig {
+    private static final int SETTINGS_EXPORT_VERSION = 1;
     private static final String PREFS_NAME = "BreakfastPrefs";
     private static final String KEY_CITY = "weather_city";
     private static final String KEY_RSS_FEEDS = "rss_feeds";
@@ -850,5 +855,126 @@ public class AppConfig {
 
     public boolean isTopStoriesAvailable() {
         return isLlmConfigured();
+    }
+
+    public String exportSettingsJson() {
+        JsonObject root = new JsonObject();
+        root.addProperty("version", SETTINGS_EXPORT_VERSION);
+        root.addProperty("preferencesName", PREFS_NAME);
+
+        JsonObject preferences = new JsonObject();
+        for (java.util.Map.Entry<String, ?> entry : prefs.getAll().entrySet()) {
+            JsonObject serializedPreference = serializePreferenceValue(entry.getValue());
+            if (serializedPreference != null) {
+                preferences.add(entry.getKey(), serializedPreference);
+            }
+        }
+        root.add("preferences", preferences);
+        return gson.toJson(root);
+    }
+
+    public void importSettingsJson(String json) {
+        JsonObject root;
+        try {
+            root = gson.fromJson(json, JsonObject.class);
+        } catch (JsonParseException exception) {
+            throw new IllegalArgumentException("Invalid settings file", exception);
+        }
+
+        if (root == null || !root.has("preferences") || !root.get("preferences").isJsonObject()) {
+            throw new IllegalArgumentException("Invalid settings file");
+        }
+
+        JsonObject preferences = root.getAsJsonObject("preferences");
+        SharedPreferences.Editor editor = prefs.edit().clear();
+        for (java.util.Map.Entry<String, JsonElement> entry : preferences.entrySet()) {
+            if (!entry.getValue().isJsonObject()) {
+                continue;
+            }
+
+            JsonObject serializedPreference = entry.getValue().getAsJsonObject();
+            if (!serializedPreference.has("type") || !serializedPreference.has("value")) {
+                continue;
+            }
+
+            String key = entry.getKey();
+            String type = serializedPreference.get("type").getAsString();
+            JsonElement value = serializedPreference.get("value");
+
+            switch (type) {
+                case "string":
+                    editor.putString(key, value.isJsonNull() ? null : value.getAsString());
+                    break;
+                case "boolean":
+                    editor.putBoolean(key, value.getAsBoolean());
+                    break;
+                case "int":
+                    editor.putInt(key, value.getAsInt());
+                    break;
+                case "long":
+                    editor.putLong(key, value.getAsLong());
+                    break;
+                case "float":
+                    editor.putFloat(key, value.getAsFloat());
+                    break;
+                case "string_set":
+                    if (!value.isJsonArray()) {
+                        break;
+                    }
+                    java.util.Set<String> values = new java.util.HashSet<>();
+                    for (JsonElement item : value.getAsJsonArray()) {
+                        if (!item.isJsonNull()) {
+                            values.add(item.getAsString());
+                        }
+                    }
+                    editor.putStringSet(key, values);
+                    break;
+                default:
+                    break;
+            }
+        }
+        editor.apply();
+        ensureCacheCompatibility();
+    }
+
+    private JsonObject serializePreferenceValue(Object value) {
+        JsonObject serializedPreference = new JsonObject();
+        if (value instanceof String) {
+            serializedPreference.addProperty("type", "string");
+            serializedPreference.addProperty("value", (String) value);
+            return serializedPreference;
+        }
+        if (value instanceof Boolean) {
+            serializedPreference.addProperty("type", "boolean");
+            serializedPreference.addProperty("value", (Boolean) value);
+            return serializedPreference;
+        }
+        if (value instanceof Integer) {
+            serializedPreference.addProperty("type", "int");
+            serializedPreference.addProperty("value", (Integer) value);
+            return serializedPreference;
+        }
+        if (value instanceof Long) {
+            serializedPreference.addProperty("type", "long");
+            serializedPreference.addProperty("value", (Long) value);
+            return serializedPreference;
+        }
+        if (value instanceof Float) {
+            serializedPreference.addProperty("type", "float");
+            serializedPreference.addProperty("value", (Float) value);
+            return serializedPreference;
+        }
+        if (value instanceof java.util.Set) {
+            serializedPreference.addProperty("type", "string_set");
+            JsonArray values = new JsonArray();
+            for (Object item : (java.util.Set<?>) value) {
+                if (item instanceof String) {
+                    values.add((String) item);
+                }
+            }
+            serializedPreference.add("value", values);
+            return serializedPreference;
+        }
+        return null;
     }
 }

@@ -489,6 +489,41 @@
                 app:cornerRadius="12dp"
                 android:layout_marginBottom="24dp" />
 
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Backup &amp; Restore"
+                android:textAppearance="?attr/textAppearanceTitleSmall"
+                android:textColor="@color/primary_blue"
+                android:textStyle="bold"
+                android:layout_marginBottom="4dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Export your Breakfast settings to a file, or import a previous backup to restore feeds, API keys, dashboard modules, and other preferences."
+                android:textAppearance="?attr/textAppearanceBodySmall"
+                android:textColor="@color/text_light"
+                android:layout_marginBottom="12dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_export_settings"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Export Settings"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                app:cornerRadius="12dp"
+                android:layout_marginBottom="8dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_import_settings"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Import Settings"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                app:cornerRadius="12dp"
+                android:layout_marginBottom="24dp" />
+
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 
