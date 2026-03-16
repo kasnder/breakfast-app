@@ -32,9 +32,6 @@ public class HeadlineRefreshWorker extends Worker {
         }
 
         long now = System.currentTimeMillis();
-        if (config.isNewsRefreshOnOpenEnabled()) {
-            return Result.success();
-        }
         int refreshHour = config.getMorningRefreshHour();
         int refreshMinute = config.getMorningRefreshMinute();
         List<ArticleData> fetched = new RssFetcher().fetchAllFeeds(headlineFeeds);

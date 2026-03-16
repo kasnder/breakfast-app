@@ -10,6 +10,8 @@ import net.kollnig.breakfast.weather.*;
 
 import android.content.Context;
 
+import androidx.work.ExistingWorkPolicy;
+import androidx.work.OneTimeWorkRequest;
 import androidx.work.ExistingPeriodicWorkPolicy;
 import androidx.work.PeriodicWorkRequest;
 import androidx.work.WorkManager;
@@ -20,6 +22,7 @@ import java.util.concurrent.TimeUnit;
 public final class DashboardScheduler {
     private static final String MORNING_WORK_NAME = "breakfast_morning_refresh";
     private static final String HEADLINE_WORK_NAME = "breakfast_headline_refresh";
+    private static final String IMMEDIATE_REFRESH_WORK_NAME = "breakfast_immediate_refresh";
 
     private DashboardScheduler() {}
 
@@ -38,11 +41,18 @@ public final class DashboardScheduler {
                 request
         );
 
-        if (config.isNewsRefreshOnOpenEnabled()) {
-            WorkManager.getInstance(context).cancelUniqueWork(HEADLINE_WORK_NAME);
-        } else {
-            scheduleHeadlineRefresh(context);
-        }
+        scheduleHeadlineRefresh(context);
+    }
+
+    public static void enqueueImmediateRefresh(Context context) {
+        OneTimeWorkRequest request = new OneTimeWorkRequest.Builder(DashboardRefreshWorker.class)
+                .build();
+
+        WorkManager.getInstance(context).enqueueUniqueWork(
+                IMMEDIATE_REFRESH_WORK_NAME,
+                ExistingWorkPolicy.REPLACE,
+                request
+        );
     }
 
     private static void scheduleHeadlineRefresh(Context context) {

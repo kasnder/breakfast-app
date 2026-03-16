@@ -264,35 +264,29 @@ public class NewsDashboardModule {
                 int refreshHour = config.getMorningRefreshHour();
                 int refreshMinute = config.getMorningRefreshMinute();
                 List<ArticleData> fetched = new RssFetcher().fetchAllFeeds(feeds);
+                List<ArticleData> headlinePool = NewsCache.mergeRollingWindow(
+                        config.getCachedHeadlinePool(),
+                        fetched,
+                        now
+                );
+                config.setCachedHeadlinePool(headlinePool);
+                long currentDeliveryWindowStart = NewsCache.computeWindowStart(
+                        now,
+                        refreshHour,
+                        refreshMinute
+                );
                 List<ArticleData> displayArticles;
-                if (config.isNewsRefreshOnOpenEnabled()) {
-                    displayArticles = NewsCache.snapshotWindow(fetched, now);
-                    config.setCachedHeadlines(displayArticles);
-                    config.setHeadlinesLastRefresh(now);
-                } else {
-                    List<ArticleData> headlinePool = NewsCache.mergeRollingWindow(
-                            config.getCachedHeadlinePool(),
-                            fetched,
-                            now
-                    );
-                    config.setCachedHeadlinePool(headlinePool);
-                    long currentDeliveryWindowStart = NewsCache.computeWindowStart(
+                if (config.getHeadlinesLastRefresh() < currentDeliveryWindowStart) {
+                    displayArticles = NewsCache.snapshotForDeliveryWindow(
+                            headlinePool,
                             now,
                             refreshHour,
                             refreshMinute
                     );
-                    if (config.getHeadlinesLastRefresh() < currentDeliveryWindowStart) {
-                        displayArticles = NewsCache.snapshotForDeliveryWindow(
-                                headlinePool,
-                                now,
-                                refreshHour,
-                                refreshMinute
-                        );
-                        config.setCachedHeadlines(displayArticles);
-                        config.setHeadlinesLastRefresh(currentDeliveryWindowStart);
-                    } else {
-                        displayArticles = config.getCachedHeadlines();
-                    }
+                    config.setCachedHeadlines(displayArticles);
+                    config.setHeadlinesLastRefresh(currentDeliveryWindowStart);
+                } else {
+                    displayArticles = config.getCachedHeadlines();
                 }
 
                 List<ArticleData> finalDisplayArticles = displayArticles;

@@ -213,17 +213,6 @@ public class MainActivity extends AppCompatActivity {
 
         newsModule.loadCachedHeadlines();
         newsModule.loadCachedArticles();
-        List<String> headlineFeeds = config.getEffectiveHeadlineFeedUrls();
-        List<String> topStoryFeeds = config.isTopStoriesAvailable()
-                ? config.getTopStoryFeedUrls()
-                : new ArrayList<>();
-        if (config.isNewsModuleEnabled() && (!headlineFeeds.isEmpty() || !topStoryFeeds.isEmpty())) {
-            if (config.isNewsRefreshOnOpenEnabled()) {
-                if (!headlineFeeds.isEmpty()) {
-                    newsModule.loadHeadlines();
-                }
-            }
-        }
     }
 
     @Override
@@ -248,11 +237,9 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.menu_main, menu);
-        boolean isDebug = (getApplicationInfo().flags
-                & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0;
         MenuItem refreshItem = menu.findItem(R.id.action_refresh);
         if (refreshItem != null) {
-            refreshItem.setVisible(isDebug || config.isNewsRefreshOnOpenEnabled());
+            refreshItem.setVisible(config.isRefreshButtonEnabled());
         }
         return true;
     }
@@ -260,13 +247,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         if (item.getItemId() == R.id.action_refresh) {
-            boolean isDebug = (getApplicationInfo().flags
-                    & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0;
-            if (isDebug) {
-                runFullRefresh(true);
-            } else {
-                runHeadlineRefresh(true);
-            }
+            runFullRefresh(true);
             return true;
         }
         if (item.getItemId() == R.id.action_play_briefing) {
@@ -378,21 +359,6 @@ public class MainActivity extends AppCompatActivity {
             }
             newsModule.loadHeadlines();
             newsModule.loadNews();
-        }
-    }
-
-    private void runHeadlineRefresh(boolean clearHeadlineCacheFirst) {
-        if (config.isWeatherModuleEnabled()) {
-            weatherModule.refreshData();
-        }
-        if (config.isTodoistModuleEnabled()) {
-            todoistModule.refreshData();
-        }
-        if (config.isNewsModuleEnabled() && !config.getEffectiveHeadlineFeedUrls().isEmpty()) {
-            if (clearHeadlineCacheFirst) {
-                config.clearHeadlineCache();
-            }
-            newsModule.loadHeadlines();
         }
     }
 

@@ -309,14 +309,14 @@
                 android:id="@+id/switch_news_refresh_on_open"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Refresh latest list when the app opens"
+                android:text="Show refresh button"
                 android:layout_marginBottom="4dp" />
 
             <TextView
                 android:id="@+id/text_news_refresh_mode"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Default: keep a quiet morning snapshot in the background. If you turn this on, opening the app refreshes only the latest-feed list."
+                android:text="Hide the toolbar refresh button. Breakfast will still refresh on its normal schedule in the background."
                 android:textAppearance="?attr/textAppearanceBodySmall"
                 android:textColor="@color/text_light"
                 android:layout_marginBottom="8dp" />

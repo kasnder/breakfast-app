@@ -58,7 +58,8 @@ public class AppConfig {
     private static final String KEY_MORNING_REFRESH_HOUR = "morning_refresh_hour";
     private static final String KEY_MORNING_REFRESH_MINUTE = "morning_refresh_minute";
     private static final String KEY_MORNING_NOTIFICATION_ENABLED = "morning_notification_enabled";
-    private static final String KEY_NEWS_REFRESH_ON_OPEN = "news_refresh_on_open";
+    // Legacy preference key retained for backwards compatibility with existing installs.
+    private static final String KEY_ENABLE_REFRESH_BUTTON = "news_refresh_on_open";
     private static final String KEY_WEATHER_ENABLED = "module_weather_enabled";
     private static final String KEY_NEWS_ENABLED = "module_news_enabled";
     private static final String KEY_SOCIAL_ENABLED = "module_social_enabled";
@@ -132,6 +133,9 @@ public class AppConfig {
 
     public List<FeedConfig> getFeedConfigs() {
         String json = prefs.getString(KEY_RSS_FEEDS, "[]");
+        if (json == null || json.trim().isEmpty()) {
+            json = "[]";
+        }
         try {
             Type configListType = new TypeToken<List<FeedConfig>>() {}.getType();
             List<FeedConfig> configs = gson.fromJson(json, configListType);
@@ -184,15 +188,16 @@ public class AppConfig {
         invalidateNewsCaches();
     }
 
-    public void addRssFeed(String url) {
+    public boolean addRssFeed(String url) {
         List<FeedConfig> feeds = getFeedConfigs();
         for (FeedConfig feed : feeds) {
             if (url.equals(feed.url)) {
-                return;
+                return false;
             }
         }
         feeds.add(new FeedConfig(url, false, true));
         setFeedConfigs(feeds);
+        return true;
     }
 
     public void removeRssFeed(String url) {
@@ -835,16 +840,12 @@ public class AppConfig {
         prefs.edit().putBoolean(KEY_MORNING_NOTIFICATION_ENABLED, enabled).apply();
     }
 
-    public boolean isNewsRefreshOnOpenEnabled() {
-        return prefs.getBoolean(KEY_NEWS_REFRESH_ON_OPEN, false);
+    public boolean isRefreshButtonEnabled() {
+        return prefs.getBoolean(KEY_ENABLE_REFRESH_BUTTON, false);
     }
 
-    public void setNewsRefreshOnOpenEnabled(boolean enabled) {
-        boolean changed = isNewsRefreshOnOpenEnabled() != enabled;
-        prefs.edit().putBoolean(KEY_NEWS_REFRESH_ON_OPEN, enabled).apply();
-        if (changed) {
-            invalidateNewsCaches();
-        }
+    public void setRefreshButtonEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_ENABLE_REFRESH_BUTTON, enabled).apply();
     }
 
     // --- LLM Configuration Validity ---
@@ -903,7 +904,11 @@ public class AppConfig {
 
             switch (type) {
                 case "string":
-                    editor.putString(key, value.isJsonNull() ? null : value.getAsString());
+                    if (value.isJsonNull()) {
+                        editor.remove(key);
+                    } else {
+                        editor.putString(key, value.getAsString());
+                    }
                     break;
                 case "boolean":
                     editor.putBoolean(key, value.getAsBoolean());

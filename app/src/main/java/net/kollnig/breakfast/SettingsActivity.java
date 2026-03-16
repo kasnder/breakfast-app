@@ -85,12 +85,12 @@ public class SettingsActivity extends AppCompatActivity {
     private MaterialButton btnUnlockSocial;
     private MaterialButton btnGrantCalendarAccess;
     private MaterialSwitch switchMorningDelivery;
-    private MaterialSwitch switchNewsRefreshOnOpen;
+    private MaterialSwitch switchEnableRefreshButton;
     private MaterialSwitch switchBriefingOpenAiTts;
     private TextView calendarPermissionStatus;
     private TextView socialModuleLockHint;
     private TextView morningRefreshTimeText;
-    private TextView newsRefreshModeText;
+    private TextView refreshButtonModeText;
     private TextView briefingOpenAiTtsText;
     private List<String> moduleOrder = new ArrayList<>();
     private final Map<String, MaterialSwitch> moduleSwitches = new HashMap<>();
@@ -157,12 +157,12 @@ public class SettingsActivity extends AppCompatActivity {
         btnUnlockSocial = findViewById(R.id.btn_unlock_social);
         btnGrantCalendarAccess = findViewById(R.id.btn_grant_calendar_access);
         switchMorningDelivery = findViewById(R.id.switch_morning_delivery);
-        switchNewsRefreshOnOpen = findViewById(R.id.switch_news_refresh_on_open);
+        switchEnableRefreshButton = findViewById(R.id.switch_news_refresh_on_open);
         switchBriefingOpenAiTts = findViewById(R.id.switch_briefing_openai_tts);
         calendarPermissionStatus = findViewById(R.id.calendar_permission_status);
         socialModuleLockHint = findViewById(R.id.text_social_module_lock_hint);
         morningRefreshTimeText = findViewById(R.id.text_morning_refresh_time);
-        newsRefreshModeText = findViewById(R.id.text_news_refresh_mode);
+        refreshButtonModeText = findViewById(R.id.text_news_refresh_mode);
         briefingOpenAiTtsText = findViewById(R.id.text_briefing_openai_tts);
 
         // Add feed button
@@ -236,10 +236,9 @@ public class SettingsActivity extends AppCompatActivity {
         });
         switchMorningDelivery.setOnCheckedChangeListener((buttonView, isChecked) ->
                 config.setMorningNotificationEnabled(isChecked));
-        switchNewsRefreshOnOpen.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            config.setNewsRefreshOnOpenEnabled(isChecked);
-            DashboardScheduler.scheduleMorningRefresh(this);
-            updateNewsRefreshModeSummary();
+        switchEnableRefreshButton.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            config.setRefreshButtonEnabled(isChecked);
+            updateRefreshButtonSummary();
         });
         switchBriefingOpenAiTts.setOnCheckedChangeListener((buttonView, isChecked) -> {
             config.setBriefingUseOpenAiTtsEnabled(isChecked);
@@ -263,11 +262,11 @@ public class SettingsActivity extends AppCompatActivity {
         checkboxSocialLinkedin.setChecked(config.isLinkedinSocialEnabled());
         checkboxSocialPressHome.setChecked(config.shouldPressHomeWhenSocialTimeIsUp());
         switchMorningDelivery.setChecked(config.isMorningNotificationEnabled());
-        switchNewsRefreshOnOpen.setChecked(config.isNewsRefreshOnOpenEnabled());
+        switchEnableRefreshButton.setChecked(config.isRefreshButtonEnabled());
         switchBriefingOpenAiTts.setChecked(config.isBriefingUseOpenAiTtsEnabled());
         moduleOrder = new ArrayList<>(config.getModuleOrder());
         updateMorningRefreshTimeText();
-        updateNewsRefreshModeSummary();
+        updateRefreshButtonSummary();
         updateBriefingTtsSummary();
         refreshModuleOrderList();
         refreshFeedsList();
@@ -299,7 +298,7 @@ public class SettingsActivity extends AppCompatActivity {
         config.setLinkedinSocialEnabled(checkboxSocialLinkedin.isChecked());
         config.setPressHomeWhenSocialTimeIsUp(checkboxSocialPressHome.isChecked());
         config.setMorningNotificationEnabled(switchMorningDelivery.isChecked());
-        config.setNewsRefreshOnOpenEnabled(switchNewsRefreshOnOpen.isChecked());
+        config.setRefreshButtonEnabled(switchEnableRefreshButton.isChecked());
         config.setBriefingUseOpenAiTtsEnabled(switchBriefingOpenAiTts.isChecked());
         config.setModuleOrder(moduleOrder);
         DashboardScheduler.scheduleMorningRefresh(this);
@@ -538,8 +537,11 @@ public class SettingsActivity extends AppCompatActivity {
         if (!normalizedUrl.startsWith("http://") && !normalizedUrl.startsWith("https://")) {
             normalizedUrl = "https://" + normalizedUrl;
         }
-        config.addRssFeed(normalizedUrl);
+        boolean added = config.addRssFeed(normalizedUrl);
         refreshFeedsList();
+        if (added) {
+            DashboardScheduler.enqueueImmediateRefresh(this);
+        }
     }
 
     private void showMorningRefreshTimeDialog() {
@@ -568,11 +570,11 @@ public class SettingsActivity extends AppCompatActivity {
         morningRefreshTimeText.setText("Scheduled refresh: " + label);
     }
 
-    private void updateNewsRefreshModeSummary() {
-        if (config.isNewsRefreshOnOpenEnabled()) {
-            newsRefreshModeText.setText("Your latest-feed list refreshes whenever you open the app. The AI briefing still updates on the scheduled morning refresh only.");
+    private void updateRefreshButtonSummary() {
+        if (config.isRefreshButtonEnabled()) {
+            refreshButtonModeText.setText("Show a refresh button in the toolbar so you can manually reload the dashboard whenever you want.");
         } else {
-            newsRefreshModeText.setText("Default: keep a quiet morning snapshot. The latest-feed list updates in the background and the AI briefing waits for the next scheduled refresh.");
+            refreshButtonModeText.setText("Hide the toolbar refresh button. Breakfast will still refresh on its normal schedule in the background.");
         }
     }
 
