@@ -70,6 +70,7 @@ public class SettingsActivity extends AppCompatActivity {
     private TextInputEditText inputTodoistProjectId;
     private CheckBox checkboxSocialInstagram;
     private CheckBox checkboxSocialLinkedin;
+    private CheckBox checkboxSocialPressHome;
     private MaterialButton btnMorningRefreshTime;
     private LinearLayout rssFeedsContainer;
     private LinearLayout calendarListContainer;
@@ -135,6 +136,7 @@ public class SettingsActivity extends AppCompatActivity {
         inputTodoistProjectId = findViewById(R.id.input_todoist_project_id);
         checkboxSocialInstagram = findViewById(R.id.checkbox_social_instagram);
         checkboxSocialLinkedin = findViewById(R.id.checkbox_social_linkedin);
+        checkboxSocialPressHome = findViewById(R.id.checkbox_social_press_home);
         btnMorningRefreshTime = findViewById(R.id.btn_morning_refresh_time);
         rssFeedsContainer = findViewById(R.id.rss_feeds_container);
         calendarListContainer = findViewById(R.id.calendar_list_container);
@@ -209,6 +211,10 @@ public class SettingsActivity extends AppCompatActivity {
             config.setLinkedinSocialEnabled(isChecked);
             refreshSocialBlockingState();
         });
+        checkboxSocialPressHome.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            config.setPressHomeWhenSocialTimeIsUp(isChecked);
+            refreshSocialBlockingState();
+        });
         switchMorningDelivery.setOnCheckedChangeListener((buttonView, isChecked) ->
                 config.setMorningNotificationEnabled(isChecked));
         switchNewsRefreshOnOpen.setOnCheckedChangeListener((buttonView, isChecked) -> {
@@ -236,6 +242,7 @@ public class SettingsActivity extends AppCompatActivity {
         inputTodoistProjectId.setText(config.getTodoistProjectId());
         checkboxSocialInstagram.setChecked(config.isInstagramSocialEnabled());
         checkboxSocialLinkedin.setChecked(config.isLinkedinSocialEnabled());
+        checkboxSocialPressHome.setChecked(config.shouldPressHomeWhenSocialTimeIsUp());
         switchMorningDelivery.setChecked(config.isMorningNotificationEnabled());
         switchNewsRefreshOnOpen.setChecked(config.isNewsRefreshOnOpenEnabled());
         switchBriefingOpenAiTts.setChecked(config.isBriefingUseOpenAiTtsEnabled());
@@ -271,6 +278,7 @@ public class SettingsActivity extends AppCompatActivity {
         config.setTodoistProjectId(inputTodoistProjectId.getText().toString().trim());
         config.setInstagramSocialEnabled(checkboxSocialInstagram.isChecked());
         config.setLinkedinSocialEnabled(checkboxSocialLinkedin.isChecked());
+        config.setPressHomeWhenSocialTimeIsUp(checkboxSocialPressHome.isChecked());
         config.setMorningNotificationEnabled(switchMorningDelivery.isChecked());
         config.setNewsRefreshOnOpenEnabled(switchNewsRefreshOnOpen.isChecked());
         config.setBriefingUseOpenAiTtsEnabled(switchBriefingOpenAiTts.isChecked());
@@ -611,6 +619,8 @@ public class SettingsActivity extends AppCompatActivity {
         checkboxSocialInstagram.setAlpha(canEditSocialSettings ? 1.0f : 0.5f);
         checkboxSocialLinkedin.setEnabled(canEditSocialSettings);
         checkboxSocialLinkedin.setAlpha(canEditSocialSettings ? 1.0f : 0.5f);
+        checkboxSocialPressHome.setEnabled(canEditSocialSettings);
+        checkboxSocialPressHome.setAlpha(canEditSocialSettings ? 1.0f : 0.5f);
         socialModuleLockHint.setVisibility(showUnlockHint ? View.VISIBLE : View.GONE);
         btnUnlockSocial.setVisibility(config.isFrictionEnabled() && !canEditSocialSettings ? View.VISIBLE : View.GONE);
         btnUnlockSocial.setText(config.isFrictionEnabled() ? "Unlock settings" : "Unlock social app settings");

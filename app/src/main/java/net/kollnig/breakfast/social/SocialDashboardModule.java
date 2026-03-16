@@ -107,7 +107,7 @@ public class SocialDashboardModule {
         }
 
         if (config.isSocialTimerRunning()) {
-            socialStatus.setText("When the timer ends, only messages stay available.");
+            socialStatus.setText(getPostTimerStatusText());
             setEnabledIfVisible(btnInstagram, true);
             setEnabledIfVisible(btnLinkedin, true);
             btnResetTimer.setVisibility(View.GONE);
@@ -121,7 +121,7 @@ public class SocialDashboardModule {
             setEnabledIfVisible(btnLinkedin, false);
             btnResetTimer.setVisibility(View.VISIBLE);
             btnResetTimer.setText("Reset for another window");
-            socialResetHint.setText("Messages stay available. " + buildSocialResetHint());
+            socialResetHint.setText(getPostTimerHintPrefix() + buildSocialResetHint());
             socialResetHint.setVisibility(View.VISIBLE);
             if (countDownTimer != null) {
                 countDownTimer.cancel();
@@ -133,7 +133,7 @@ public class SocialDashboardModule {
             setEnabledIfVisible(btnLinkedin, true);
             socialTimer.setVisibility(View.GONE);
             btnResetTimer.setVisibility(View.GONE);
-            socialResetHint.setText("After it ends, only messages stay available. "
+            socialResetHint.setText(getPostTimerHintPrefix()
                     + buildSocialResetHint());
             socialResetHint.setVisibility(View.VISIBLE);
         }
@@ -335,5 +335,17 @@ public class SocialDashboardModule {
         return sameDay
                 ? "Daily limit resets today at " + timeLabel
                 : "Daily limit resets tomorrow at " + timeLabel;
+    }
+
+    private String getPostTimerStatusText() {
+        return config.shouldPressHomeWhenSocialTimeIsUp()
+                ? "When the timer ends, LinkedIn and Instagram send you back Home."
+                : "When the timer ends, only messages stay available.";
+    }
+
+    private String getPostTimerHintPrefix() {
+        return config.shouldPressHomeWhenSocialTimeIsUp()
+                ? "After it ends, LinkedIn and Instagram return to Home. "
+                : "After it ends, only messages stay available. ";
     }
 }

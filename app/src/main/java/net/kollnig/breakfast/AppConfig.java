@@ -59,6 +59,7 @@ public class AppConfig {
     private static final String KEY_SOCIAL_ENABLED = "module_social_enabled";
     private static final String KEY_SOCIAL_INSTAGRAM_ENABLED = "social_instagram_enabled";
     private static final String KEY_SOCIAL_LINKEDIN_ENABLED = "social_linkedin_enabled";
+    private static final String KEY_SOCIAL_PRESS_HOME_ON_TIMEOUT = "social_press_home_on_timeout";
     private static final String KEY_EMAIL_ENABLED = "module_email_enabled";
     private static final String KEY_CALENDAR_ENABLED = "module_calendar_enabled";
     private static final String KEY_EMAIL_NOTES = "module_email_notes";
@@ -482,6 +483,14 @@ public class AppConfig {
 
     public boolean isAnySocialAppEnabled() {
         return isInstagramSocialEnabled() || isLinkedinSocialEnabled();
+    }
+
+    public boolean shouldPressHomeWhenSocialTimeIsUp() {
+        return prefs.getBoolean(KEY_SOCIAL_PRESS_HOME_ON_TIMEOUT, true);
+    }
+
+    public void setPressHomeWhenSocialTimeIsUp(boolean enabled) {
+        prefs.edit().putBoolean(KEY_SOCIAL_PRESS_HOME_ON_TIMEOUT, enabled).apply();
     }
 
     /**

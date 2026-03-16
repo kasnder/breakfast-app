@@ -254,6 +254,13 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Limit LinkedIn after the timer ends"
+                android:layout_marginBottom="4dp" />
+
+            <CheckBox
+                android:id="@+id/checkbox_social_press_home"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Press Home instead when time is up"
                 android:layout_marginBottom="24dp" />
 
             <!-- RSS / Atom Feeds Section -->
@@ -468,7 +475,7 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="The accessibility service limits Instagram and LinkedIn after your timer ends so messages stay reachable while distracting sections are hidden."
+                android:text="The accessibility service can either hide distracting sections after your timer ends or send Instagram and LinkedIn straight back Home."
                 android:textAppearance="?attr/textAppearanceBodySmall"
                 android:textColor="@color/text_light"
                 android:layout_marginBottom="12dp" />

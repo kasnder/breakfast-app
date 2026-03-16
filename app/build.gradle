@@ -10,8 +10,8 @@ android {
         applicationId "net.kollnig.breakfast"
         minSdk 24
         targetSdk 36
-        versionCode 26031601
-        versionName "1.0.0"
+        versionCode 26031702
+        versionName "0.0.1"
     }
 
     buildTypes {
@@ -31,17 +31,17 @@ android {
 
 dependencies {
     implementation 'androidx.appcompat:appcompat:1.7.1'
-    implementation 'androidx.browser:browser:1.8.0'
+    implementation 'androidx.browser:browser:1.9.0'
     implementation 'com.google.android.material:material:1.13.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.2.1'
     implementation 'androidx.activity:activity:1.13.0'
     implementation 'androidx.core:core:1.18.0'
-    implementation 'androidx.work:work-runtime:2.10.1'
+    implementation 'androidx.work:work-runtime:2.11.1'
     implementation project(':distractionlib')
 
     // Networking
-    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    implementation 'com.squareup.okhttp3:okhttp:5.3.2'
 
     // JSON parsing
-    implementation 'com.google.code.gson:gson:2.11.0'
+    implementation 'com.google.code.gson:gson:2.13.2'
 }

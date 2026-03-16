@@ -1,6 +1,8 @@
 package net.kollnig.breakfast;
 
+import android.accessibilityservice.AccessibilityService;
 import android.util.Log;
+import android.view.accessibility.AccessibilityEvent;
 
 import net.kollnig.distractionlib.BaseDistractionControlService;
 import net.kollnig.distractionlib.FilterRule;
@@ -76,6 +78,18 @@ public class DistractionControlService extends BaseDistractionControlService {
         reevaluateBlockingState();
     }
 
+    @Override
+    public void onAccessibilityEvent(AccessibilityEvent event) {
+        if (shouldBounceBlockedSocialAppToHome(event)) {
+            Log.i(TAG, "Blocked social app opened after timer expiry, returning to launcher");
+            forceClearCurrentOverlays();
+            performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME);
+            return;
+        }
+
+        super.onAccessibilityEvent(event);
+    }
+
     private boolean shouldApplyRulesToPackage(String packageName) {
         if (config == null) {
             config = new AppConfig(this);
@@ -87,5 +101,22 @@ public class DistractionControlService extends BaseDistractionControlService {
             return config.isLinkedinSocialEnabled();
         }
         return false;
+    }
+
+    private boolean shouldBounceBlockedSocialAppToHome(AccessibilityEvent event) {
+        if (event == null) {
+            return false;
+        }
+        if (config == null) {
+            config = new AppConfig(this);
+        }
+        if (!config.shouldPressHomeWhenSocialTimeIsUp() || !shouldProcessRules()) {
+            return false;
+        }
+        if (event.getEventType() != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            return false;
+        }
+        CharSequence packageName = event.getPackageName();
+        return packageName != null && shouldApplyRulesToPackage(packageName.toString());
     }
 }

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Breakfast!</string>
-    <string name="accessibility_service_description">Breakfast limits distracting social app features after your social window ends while leaving messages available</string>
+    <string name="app_name">Breakfast! AI</string>
+    <string name="accessibility_service_description">Breakfast limits distracting social apps after your social window ends, either by hiding distracting sections or returning you Home</string>
     <string name="settings_title">Settings</string>
     <string name="notification_channel_name">Breakfast Timer</string>
     <string name="notification_channel_description">Shows remaining time for your social app access window</string>

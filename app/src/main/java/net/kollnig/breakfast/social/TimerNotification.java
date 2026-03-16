@@ -120,9 +120,14 @@ public class TimerNotification {
     }
 
     private void showExpired() {
+        AppConfig config = new AppConfig(context);
+        String expiryText = config.shouldPressHomeWhenSocialTimeIsUp()
+                ? "LinkedIn and Instagram will close to Home."
+                : "Distraction rules are now active.";
+
         NotificationCompat.Builder builder = baseBuilder()
                 .setContentTitle("Time\u2019s up!")
-                .setContentText("Distraction rules are now active.")
+                .setContentText(expiryText)
                 .setOngoing(false)
                 .setAutoCancel(true);
 
