@@ -475,6 +475,21 @@
                 android:layout_height="wrap_content"
                 style="@style/Widget.Material3.Button.TonalButton"
                 android:text="Download Gemma 1B model (~557 MB)"
+                android:layout_marginBottom="8dp" />
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/switch_llm_benchmark"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Run cloud vs device comparison on refresh"
+                android:layout_marginBottom="4dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="When enabled, each refresh runs both backends and logs a comparison. View with: adb logcat -s LlmBenchmark"
+                android:textAppearance="?attr/textAppearanceBodySmall"
+                android:textColor="@color/text_light"
                 android:layout_marginBottom="24dp" />
 
             <!-- Interest Profile Section -->

@@ -77,6 +77,7 @@ public class AppConfig {
     private static final String KEY_ON_DEVICE_LLM_ENABLED = "on_device_llm_enabled";
     private static final String KEY_ON_DEVICE_MODEL_PATH = "on_device_model_path";
     private static final String KEY_ON_DEVICE_USE_GPU = "on_device_use_gpu";
+    private static final String KEY_LLM_BENCHMARK_ENABLED = "llm_benchmark_enabled";
     private static final String KEY_NEWS_CACHE_SCHEMA_VERSION = "news_cache_schema_version";
     private static final int NEWS_CACHE_SCHEMA_VERSION = 2;
 
@@ -317,6 +318,14 @@ public class AppConfig {
 
     public void setOnDeviceUseGpu(boolean useGpu) {
         prefs.edit().putBoolean(KEY_ON_DEVICE_USE_GPU, useGpu).apply();
+    }
+
+    public boolean isLlmBenchmarkEnabled() {
+        return prefs.getBoolean(KEY_LLM_BENCHMARK_ENABLED, false);
+    }
+
+    public void setLlmBenchmarkEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_LLM_BENCHMARK_ENABLED, enabled).apply();
     }
 
     // --- Interest Profile ---

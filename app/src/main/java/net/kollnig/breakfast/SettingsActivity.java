@@ -96,6 +96,7 @@ public class SettingsActivity extends AppCompatActivity {
     private final Map<String, MaterialSwitch> moduleSwitches = new HashMap<>();
     private MaterialSwitch switchOnDeviceLlm;
     private MaterialSwitch switchOnDeviceGpu;
+    private MaterialSwitch switchLlmBenchmark;
     private MaterialButton btnDownloadModel;
     private TextView textOnDeviceLlmStatus;
     private boolean socialSettingsUnlocked;
@@ -170,6 +171,7 @@ public class SettingsActivity extends AppCompatActivity {
         briefingOpenAiTtsText = findViewById(R.id.text_briefing_openai_tts);
         switchOnDeviceLlm = findViewById(R.id.switch_on_device_llm);
         switchOnDeviceGpu = findViewById(R.id.switch_on_device_gpu);
+        switchLlmBenchmark = findViewById(R.id.switch_llm_benchmark);
         btnDownloadModel = findViewById(R.id.btn_download_model);
         textOnDeviceLlmStatus = findViewById(R.id.text_on_device_llm_status);
 
@@ -259,6 +261,8 @@ public class SettingsActivity extends AppCompatActivity {
         });
         switchOnDeviceGpu.setOnCheckedChangeListener((buttonView, isChecked) ->
                 config.setOnDeviceUseGpu(isChecked));
+        switchLlmBenchmark.setOnCheckedChangeListener((buttonView, isChecked) ->
+                config.setLlmBenchmarkEnabled(isChecked));
         btnDownloadModel.setOnClickListener(v -> startModelDownload());
     }
 
@@ -282,6 +286,7 @@ public class SettingsActivity extends AppCompatActivity {
         switchBriefingOpenAiTts.setChecked(config.isBriefingUseOpenAiTtsEnabled());
         switchOnDeviceLlm.setChecked(config.isOnDeviceLlmEnabled());
         switchOnDeviceGpu.setChecked(config.isOnDeviceUseGpu());
+        switchLlmBenchmark.setChecked(config.isLlmBenchmarkEnabled());
         updateOnDeviceModelStatus();
         moduleOrder = new ArrayList<>(config.getModuleOrder());
         updateMorningRefreshTimeText();

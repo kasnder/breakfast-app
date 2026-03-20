@@ -89,16 +89,20 @@ public class OnDeviceLlmClient {
             return fallbackTopArticles(articles, count);
         }
 
+        long startMs = System.currentTimeMillis();
         try {
             // Step 1: Score articles for relevance (lightweight prompt per article)
             List<ScoredArticle> scored = new ArrayList<>();
             int maxArticles = Math.min(articles.size(), 30);
 
+            long scoreStart = System.currentTimeMillis();
             for (int i = 0; i < maxArticles; i++) {
                 ArticleData article = articles.get(i);
                 float score = scoreArticle(article, interestProfile);
                 scored.add(new ScoredArticle(article, score));
             }
+            Log.i(TAG, "Scoring " + maxArticles + " articles took "
+                    + (System.currentTimeMillis() - scoreStart) + " ms");
 
             // Sort by score descending
             Collections.sort(scored, (a, b) -> Float.compare(b.score, a.score));
@@ -106,12 +110,17 @@ public class OnDeviceLlmClient {
             // Step 2: Summarize the top articles
             int topCount = Math.min(count, scored.size());
             List<ArticleData> result = new ArrayList<>();
+            long sumStart = System.currentTimeMillis();
             for (int i = 0; i < topCount; i++) {
                 ScoredArticle sa = scored.get(i);
                 sa.article.interestScore = sa.score;
                 sa.article.llmSummary = summarizeArticle(sa.article);
                 result.add(sa.article);
             }
+            Log.i(TAG, "Summarizing " + topCount + " articles took "
+                    + (System.currentTimeMillis() - sumStart) + " ms");
+            Log.i(TAG, "On-device rankAndSummarize total: " + result.size() + " articles in "
+                    + (System.currentTimeMillis() - startMs) + " ms");
 
             return result;
         } catch (Exception e) {

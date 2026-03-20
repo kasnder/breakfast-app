@@ -356,6 +356,11 @@ public class NewsDashboardModule {
                     return;
                 }
 
+                // Run benchmark comparison if enabled (before the main path)
+                if (config.isLlmBenchmarkEnabled()) {
+                    LlmBenchmark.compare(activity, config, allArticles);
+                }
+
                 List<ArticleData> topArticles;
                 boolean llmFailed = false;
 
