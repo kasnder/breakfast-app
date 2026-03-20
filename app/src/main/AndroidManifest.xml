@@ -17,8 +17,6 @@
         <package android:name="com.linkedin.android" />
     </queries>
 
-    <!-- GPU support for LiteRT-LM on-device inference -->
-    <uses-native-library android:name="libOpenCL.so" android:required="false"/>
 
     <application
         android:allowBackup="true"
@@ -32,6 +30,10 @@
         android:usesCleartextTraffic="true"
         android:isAccessibilityTool="true"
         tools:targetApi="31">
+
+        <!-- GPU support for LiteRT-LM on-device inference -->
+        <uses-native-library android:name="libOpenCL.so" android:required="false"/>
+
 
         <activity
             android:name="net.kollnig.breakfast.MainActivity"

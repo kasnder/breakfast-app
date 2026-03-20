@@ -49,6 +49,9 @@ public class OnDeviceLlmClient {
         EngineConfig config = new EngineConfig(
                 modelPath,
                 useGpu ? new Backend.GPU() : new Backend.CPU(),
+                null, // visionBackend
+                null, // audioBackend
+                null, // maxNumTokens
                 context.getCacheDir().getPath()
         );
         engine = new Engine(config);
@@ -105,7 +108,7 @@ public class OnDeviceLlmClient {
                     + (System.currentTimeMillis() - scoreStart) + " ms");
 
             // Sort by score descending
-            Collections.sort(scored, (a, b) -> Float.compare(b.score, a.score));
+            scored.sort((a, b) -> Float.compare(b.score, a.score));
 
             // Step 2: Summarize the top articles
             int topCount = Math.min(count, scored.size());
@@ -149,16 +152,18 @@ public class OnDeviceLlmClient {
                     + "\nArticle description: " + truncate(article.originalDescription, 300)
                     + "\n\nRelevance score (0.0-1.0):";
 
+            SamplerConfig samplerConfig = new SamplerConfig(1, 0.95, 0.1, 0);
             ConversationConfig convConfig = new ConversationConfig(
-                    Contents.of(systemPrompt),
-                    null,
-                    new SamplerConfig(1, 0.95f, 0.1f),
+                    Contents.Companion.of(systemPrompt),
+                    Collections.emptyList(),
+                    Collections.emptyList(),
+                    samplerConfig,
                     null,
                     false
             );
 
             try (Conversation conversation = engine.createConversation(convConfig)) {
-                Message response = conversation.sendMessage(userPrompt);
+                Message response = conversation.sendMessage(userPrompt, Collections.emptyMap());
                 String text = response.toString().trim();
                 return parseScore(text);
             }
@@ -180,16 +185,18 @@ public class OnDeviceLlmClient {
                     + "\nDescription: " + truncate(article.originalDescription, 500)
                     + "\n\nSummary:";
 
+            SamplerConfig samplerConfig = new SamplerConfig(10, 0.95, 0.3, 0);
             ConversationConfig convConfig = new ConversationConfig(
-                    Contents.of(systemPrompt),
-                    null,
-                    new SamplerConfig(10, 0.95f, 0.3f),
+                    Contents.Companion.of(systemPrompt),
+                    Collections.emptyList(),
+                    Collections.emptyList(),
+                    samplerConfig,
                     null,
                     false
             );
 
             try (Conversation conversation = engine.createConversation(convConfig)) {
-                Message response = conversation.sendMessage(userPrompt);
+                Message response = conversation.sendMessage(userPrompt, Collections.emptyMap());
                 String summary = response.toString().trim();
                 // Clean up any leading/trailing artifacts
                 if (summary.isEmpty()) return null;
@@ -225,16 +232,18 @@ public class OnDeviceLlmClient {
             String userPrompt = "Dashboard data:\n\n" + trimmedData
                     + "\n\nWrite a brief spoken morning briefing script:";
 
+            SamplerConfig samplerConfig = new SamplerConfig(10, 0.95, 0.4, 0);
             ConversationConfig convConfig = new ConversationConfig(
-                    Contents.of(systemPrompt),
-                    null,
-                    new SamplerConfig(10, 0.95f, 0.4f),
+                    Contents.Companion.of(systemPrompt),
+                    Collections.emptyList(),
+                    Collections.emptyList(),
+                    samplerConfig,
                     null,
                     false
             );
 
             try (Conversation conversation = engine.createConversation(convConfig)) {
-                Message response = conversation.sendMessage(userPrompt);
+                Message response = conversation.sendMessage(userPrompt, Collections.emptyMap());
                 String script = response.toString().trim();
                 if (script.isEmpty()) return null;
                 return script;
@@ -280,8 +289,11 @@ public class OnDeviceLlmClient {
             Pattern pattern = Pattern.compile("(\\d+\\.?\\d*)");
             Matcher matcher = pattern.matcher(text);
             if (matcher.find()) {
-                float score = Float.parseFloat(matcher.group(1));
-                return Math.max(0f, Math.min(1f, score));
+                String group = matcher.group(1);
+                if (group != null) {
+                    float score = Float.parseFloat(group);
+                    return Math.max(0f, Math.min(1f, score));
+                }
             }
         } catch (Exception ignored) {}
         return 0.5f;
@@ -300,7 +312,7 @@ public class OnDeviceLlmClient {
 
     private List<ArticleData> fallbackTopArticles(List<ArticleData> articles, int count) {
         List<ArticleData> sorted = new ArrayList<>(articles);
-        Collections.sort(sorted, (a, b) -> Long.compare(b.pubDate, a.pubDate));
+        sorted.sort((a, b) -> Long.compare(b.pubDate, a.pubDate));
         List<ArticleData> top = new ArrayList<>();
         for (int i = 0; i < Math.min(count, sorted.size()); i++) {
             top.add(sorted.get(i));
