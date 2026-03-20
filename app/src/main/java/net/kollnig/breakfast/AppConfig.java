@@ -174,6 +174,10 @@ public class AppConfig {
                 }
             }
         }
+        // Persist the migrated format so we don't re-parse legacy data every time.
+        if (!migrated.isEmpty()) {
+            prefs.edit().putString(KEY_RSS_FEEDS, gson.toJson(migrated)).apply();
+        }
         return migrated;
     }
 
