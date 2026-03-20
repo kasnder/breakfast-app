@@ -74,6 +74,9 @@ public class AppConfig {
     private static final String KEY_MODULE_ORDER = "module_order";
     private static final String KEY_WELCOME_DISMISSED = "welcome_dismissed";
     private static final String KEY_DASHBOARD_LAST_REFRESH = "dashboard_last_refresh";
+    private static final String KEY_ON_DEVICE_LLM_ENABLED = "on_device_llm_enabled";
+    private static final String KEY_ON_DEVICE_MODEL_PATH = "on_device_model_path";
+    private static final String KEY_ON_DEVICE_USE_GPU = "on_device_use_gpu";
     private static final String KEY_NEWS_CACHE_SCHEMA_VERSION = "news_cache_schema_version";
     private static final int NEWS_CACHE_SCHEMA_VERSION = 2;
 
@@ -288,6 +291,32 @@ public class AppConfig {
 
     public void setLlmModel(String model) {
         prefs.edit().putString(KEY_LLM_MODEL, model).apply();
+    }
+
+    // --- On-Device LLM Config ---
+
+    public boolean isOnDeviceLlmEnabled() {
+        return prefs.getBoolean(KEY_ON_DEVICE_LLM_ENABLED, false);
+    }
+
+    public void setOnDeviceLlmEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_ON_DEVICE_LLM_ENABLED, enabled).apply();
+    }
+
+    public String getOnDeviceModelPath() {
+        return prefs.getString(KEY_ON_DEVICE_MODEL_PATH, "");
+    }
+
+    public void setOnDeviceModelPath(String path) {
+        prefs.edit().putString(KEY_ON_DEVICE_MODEL_PATH, path).apply();
+    }
+
+    public boolean isOnDeviceUseGpu() {
+        return prefs.getBoolean(KEY_ON_DEVICE_USE_GPU, true);
+    }
+
+    public void setOnDeviceUseGpu(boolean useGpu) {
+        prefs.edit().putBoolean(KEY_ON_DEVICE_USE_GPU, useGpu).apply();
     }
 
     // --- Interest Profile ---
@@ -855,7 +884,13 @@ public class AppConfig {
     }
 
     public boolean isTopStoriesAvailable() {
-        return isLlmConfigured();
+        return isLlmConfigured() || isOnDeviceLlmReady();
+    }
+
+    public boolean isOnDeviceLlmReady() {
+        return isOnDeviceLlmEnabled()
+                && !getOnDeviceModelPath().isEmpty()
+                && new java.io.File(getOnDeviceModelPath()).exists();
     }
 
     public String exportSettingsJson() {

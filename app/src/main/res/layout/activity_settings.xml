@@ -428,6 +428,55 @@
                     android:inputType="text" />
             </com.google.android.material.textfield.TextInputLayout>
 
+            <!-- On-Device LLM Section -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="On-Device Model"
+                android:textAppearance="?attr/textAppearanceTitleSmall"
+                android:textColor="@color/primary_blue"
+                android:textStyle="bold"
+                android:layout_marginBottom="4dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Use an on-device LLM (Gemma 1B) to rank and summarize articles locally, with no cloud API needed. Slower but fully private and offline."
+                android:textAppearance="?attr/textAppearanceBodySmall"
+                android:textColor="@color/text_light"
+                android:layout_marginBottom="12dp" />
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/switch_on_device_llm"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Use on-device model instead of cloud API"
+                android:layout_marginBottom="4dp" />
+
+            <TextView
+                android:id="@+id/text_on_device_llm_status"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Model not downloaded"
+                android:textAppearance="?attr/textAppearanceBodySmall"
+                android:textColor="@color/text_light"
+                android:layout_marginBottom="8dp" />
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/switch_on_device_gpu"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Use GPU acceleration"
+                android:layout_marginBottom="8dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_download_model"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:text="Download Gemma 1B model (~557 MB)"
+                android:layout_marginBottom="24dp" />
+
             <!-- Interest Profile Section -->
             <TextView
                 android:layout_width="wrap_content"

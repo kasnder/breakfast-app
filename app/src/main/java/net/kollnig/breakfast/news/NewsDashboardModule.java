@@ -194,7 +194,7 @@ public class NewsDashboardModule {
 
     public void loadCachedArticles() {
         if (!config.isTopStoriesAvailable()) {
-            newsStatus.setText("AI Briefing needs a working API setup. Latest From Your Feeds will still use all feed sources.");
+            newsStatus.setText("AI Briefing needs a cloud API or on-device model. Latest From Your Feeds will still use all feed sources.");
             newsStatus.setVisibility(View.VISIBLE);
             newsWarning.setVisibility(View.GONE);
             newsResetHint.setVisibility(View.GONE);
@@ -311,7 +311,7 @@ public class NewsDashboardModule {
             newsWarning.setVisibility(View.GONE);
             newsResetHint.setVisibility(View.GONE);
             btnNewsShowAll.setVisibility(View.GONE);
-            newsStatus.setText("AI Briefing needs a working API setup. Latest From Your Feeds will still use all feed sources.");
+            newsStatus.setText("AI Briefing needs a cloud API or on-device model. Latest From Your Feeds will still use all feed sources.");
             newsStatus.setVisibility(View.VISIBLE);
             return;
         }
@@ -359,12 +359,26 @@ public class NewsDashboardModule {
                 List<ArticleData> topArticles;
                 boolean llmFailed = false;
 
-                LlmClient llm = new LlmClient(
-                        config.getLlmBaseUrl(),
-                        config.getLlmApiKey(),
-                        config.getLlmModel());
-                topArticles = llm.rankAndSummarize(allArticles, config.getInterestProfile(),
-                        config.getArticleCount());
+                if (config.isOnDeviceLlmReady()) {
+                    OnDeviceLlmClient onDevice = new OnDeviceLlmClient(
+                            activity,
+                            config.getOnDeviceModelPath(),
+                            config.isOnDeviceUseGpu());
+                    try {
+                        onDevice.initialize();
+                        topArticles = onDevice.rankAndSummarize(allArticles,
+                                config.getInterestProfile(), config.getArticleCount());
+                    } finally {
+                        onDevice.close();
+                    }
+                } else {
+                    LlmClient llm = new LlmClient(
+                            config.getLlmBaseUrl(),
+                            config.getLlmApiKey(),
+                            config.getLlmModel());
+                    topArticles = llm.rankAndSummarize(allArticles, config.getInterestProfile(),
+                            config.getArticleCount());
+                }
 
                 // Check if LLM actually produced summaries or fell back
                 boolean anySummary = false;
@@ -671,16 +685,33 @@ public class NewsDashboardModule {
     private String buildBriefingTranscript() {
         String fallbackTranscript = buildFallbackBriefingTranscript();
         String structuredData = buildStructuredDashboardData();
-        if (!config.isLlmConfigured() || structuredData.trim().isEmpty()) {
+        if (structuredData.trim().isEmpty()) {
             return fallbackTranscript;
         }
 
-        LlmClient llmClient = new LlmClient(
-                config.getLlmBaseUrl(),
-                config.getLlmApiKey(),
-                config.getLlmModel()
-        );
-        String generated = llmClient.generateMorningBriefingScript(structuredData);
+        String generated = null;
+        if (config.isOnDeviceLlmReady()) {
+            OnDeviceLlmClient onDevice = new OnDeviceLlmClient(
+                    activity,
+                    config.getOnDeviceModelPath(),
+                    config.isOnDeviceUseGpu());
+            try {
+                onDevice.initialize();
+                generated = onDevice.generateMorningBriefingScript(structuredData);
+            } catch (Exception e) {
+                Log.w(TAG, "On-device briefing script failed, falling back", e);
+            } finally {
+                onDevice.close();
+            }
+        } else if (config.isLlmConfigured()) {
+            LlmClient llmClient = new LlmClient(
+                    config.getLlmBaseUrl(),
+                    config.getLlmApiKey(),
+                    config.getLlmModel()
+            );
+            generated = llmClient.generateMorningBriefingScript(structuredData);
+        }
+
         if (generated == null || generated.trim().isEmpty()) {
             return fallbackTranscript;
         }

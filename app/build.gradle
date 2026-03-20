@@ -44,4 +44,7 @@ dependencies {
 
     // JSON parsing
     implementation 'com.google.code.gson:gson:2.13.2'
+
+    // On-device LLM inference
+    implementation 'com.google.ai.edge.litertlm:litertlm-android:0.9.0-alpha03'
 }

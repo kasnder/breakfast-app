@@ -80,14 +80,30 @@ public class DashboardRefreshWorker extends Worker {
 
                 if (config.isTopStoriesAvailable()) {
                     try {
-                        LlmClient llm = new LlmClient(
-                                config.getLlmBaseUrl(),
-                                config.getLlmApiKey(),
-                                config.getLlmModel());
-                        topArticles = llm.rankAndSummarize(
-                                allArticles,
-                                config.getInterestProfile(),
-                                config.getArticleCount());
+                        if (config.isOnDeviceLlmReady()) {
+                            OnDeviceLlmClient onDevice = new OnDeviceLlmClient(
+                                    context,
+                                    config.getOnDeviceModelPath(),
+                                    config.isOnDeviceUseGpu());
+                            try {
+                                onDevice.initialize();
+                                topArticles = onDevice.rankAndSummarize(
+                                        allArticles,
+                                        config.getInterestProfile(),
+                                        config.getArticleCount());
+                            } finally {
+                                onDevice.close();
+                            }
+                        } else {
+                            LlmClient llm = new LlmClient(
+                                    config.getLlmBaseUrl(),
+                                    config.getLlmApiKey(),
+                                    config.getLlmModel());
+                            topArticles = llm.rankAndSummarize(
+                                    allArticles,
+                                    config.getInterestProfile(),
+                                    config.getArticleCount());
+                        }
                     } catch (Exception ignored) {
                         // Keep fallback top articles from the feed sort if AI is unavailable.
                     }

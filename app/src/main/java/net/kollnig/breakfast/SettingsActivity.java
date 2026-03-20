@@ -94,6 +94,10 @@ public class SettingsActivity extends AppCompatActivity {
     private TextView briefingOpenAiTtsText;
     private List<String> moduleOrder = new ArrayList<>();
     private final Map<String, MaterialSwitch> moduleSwitches = new HashMap<>();
+    private MaterialSwitch switchOnDeviceLlm;
+    private MaterialSwitch switchOnDeviceGpu;
+    private MaterialButton btnDownloadModel;
+    private TextView textOnDeviceLlmStatus;
     private boolean socialSettingsUnlocked;
     private boolean updatingSocialModuleSwitch;
 
@@ -164,6 +168,10 @@ public class SettingsActivity extends AppCompatActivity {
         morningRefreshTimeText = findViewById(R.id.text_morning_refresh_time);
         refreshButtonModeText = findViewById(R.id.text_news_refresh_mode);
         briefingOpenAiTtsText = findViewById(R.id.text_briefing_openai_tts);
+        switchOnDeviceLlm = findViewById(R.id.switch_on_device_llm);
+        switchOnDeviceGpu = findViewById(R.id.switch_on_device_gpu);
+        btnDownloadModel = findViewById(R.id.btn_download_model);
+        textOnDeviceLlmStatus = findViewById(R.id.text_on_device_llm_status);
 
         // Add feed button
         findViewById(R.id.btn_add_feed).setOnClickListener(v -> showAddFeedDialog());
@@ -244,6 +252,14 @@ public class SettingsActivity extends AppCompatActivity {
             config.setBriefingUseOpenAiTtsEnabled(isChecked);
             updateBriefingTtsSummary();
         });
+        switchOnDeviceLlm.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            config.setOnDeviceLlmEnabled(isChecked);
+            updateOnDeviceModelStatus();
+            refreshFeedsList();
+        });
+        switchOnDeviceGpu.setOnCheckedChangeListener((buttonView, isChecked) ->
+                config.setOnDeviceUseGpu(isChecked));
+        btnDownloadModel.setOnClickListener(v -> startModelDownload());
     }
 
     private void loadSettings() {
@@ -264,6 +280,9 @@ public class SettingsActivity extends AppCompatActivity {
         switchMorningDelivery.setChecked(config.isMorningNotificationEnabled());
         switchEnableRefreshButton.setChecked(config.isRefreshButtonEnabled());
         switchBriefingOpenAiTts.setChecked(config.isBriefingUseOpenAiTtsEnabled());
+        switchOnDeviceLlm.setChecked(config.isOnDeviceLlmEnabled());
+        switchOnDeviceGpu.setChecked(config.isOnDeviceUseGpu());
+        updateOnDeviceModelStatus();
         moduleOrder = new ArrayList<>(config.getModuleOrder());
         updateMorningRefreshTimeText();
         updateRefreshButtonSummary();
@@ -584,6 +603,88 @@ public class SettingsActivity extends AppCompatActivity {
         } else {
             briefingOpenAiTtsText.setText("Breakfast reads the briefing with Android's on-device voice.");
         }
+    }
+
+    private void updateOnDeviceModelStatus() {
+        String modelPath = config.getOnDeviceModelPath();
+        if (modelPath.isEmpty()) {
+            modelPath = OnDeviceLlmClient.getDefaultModelPath(this);
+        }
+        if (new java.io.File(modelPath).exists()) {
+            long sizeMb = new java.io.File(modelPath).length() / (1024 * 1024);
+            textOnDeviceLlmStatus.setText(String.format(getString(R.string.on_device_model_ready), sizeMb + " MB"));
+            btnDownloadModel.setText("Re-download model");
+        } else {
+            textOnDeviceLlmStatus.setText(R.string.on_device_model_not_downloaded);
+            btnDownloadModel.setText("Download Gemma 1B model (~557 MB)");
+        }
+    }
+
+    private void startModelDownload() {
+        String modelPath = OnDeviceLlmClient.getDefaultModelPath(this);
+        config.setOnDeviceModelPath(modelPath);
+        btnDownloadModel.setEnabled(false);
+        textOnDeviceLlmStatus.setText(String.format(getString(R.string.on_device_model_downloading), 0));
+
+        new Thread(() -> {
+            try {
+                java.io.File outputFile = new java.io.File(modelPath);
+                java.io.File tempFile = new java.io.File(modelPath + ".tmp");
+                String url = "https://huggingface.co/litert-community/Gemma3-1B-IT/resolve/main/"
+                        + "Gemma3-1B-IT_multi-prefill-seq_q4_ekv4096.litertlm";
+
+                okhttp3.OkHttpClient downloadClient = new okhttp3.OkHttpClient.Builder()
+                        .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+                        .readTimeout(5, java.util.concurrent.TimeUnit.MINUTES)
+                        .build();
+                okhttp3.Request request = new okhttp3.Request.Builder().url(url).build();
+                okhttp3.Response response = downloadClient.newCall(request).execute();
+
+                if (!response.isSuccessful() || response.body() == null) {
+                    throw new IOException("Download failed: HTTP " + response.code());
+                }
+
+                long contentLength = response.body().contentLength();
+                try (java.io.InputStream in = response.body().byteStream();
+                     java.io.FileOutputStream out = new java.io.FileOutputStream(tempFile)) {
+                    byte[] buffer = new byte[8192];
+                    long downloaded = 0;
+                    int lastPercent = 0;
+                    int read;
+                    while ((read = in.read(buffer)) != -1) {
+                        out.write(buffer, 0, read);
+                        downloaded += read;
+                        if (contentLength > 0) {
+                            int percent = (int) (downloaded * 100 / contentLength);
+                            if (percent != lastPercent) {
+                                lastPercent = percent;
+                                final int p = percent;
+                                runOnUiThread(() -> textOnDeviceLlmStatus.setText(
+                                        String.format(getString(R.string.on_device_model_downloading), p)));
+                            }
+                        }
+                    }
+                }
+
+                if (!tempFile.renameTo(outputFile)) {
+                    throw new IOException("Failed to move downloaded model into place");
+                }
+
+                runOnUiThread(() -> {
+                    btnDownloadModel.setEnabled(true);
+                    updateOnDeviceModelStatus();
+                    Toast.makeText(this, "Model downloaded successfully", Toast.LENGTH_SHORT).show();
+                });
+            } catch (Exception e) {
+                final String message = e.getMessage();
+                runOnUiThread(() -> {
+                    btnDownloadModel.setEnabled(true);
+                    textOnDeviceLlmStatus.setText(String.format(
+                            getString(R.string.on_device_model_download_failed), message));
+                    Toast.makeText(this, "Model download failed", Toast.LENGTH_SHORT).show();
+                });
+            }
+        }).start();
     }
 
     private static List<FeedPreset> buildFeedPresets() {
