@@ -9,6 +9,7 @@ import net.kollnig.breakfast.weather.*;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.os.Build;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
@@ -23,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Manages all configuration for the Breakfast app via SharedPreferences.
@@ -100,7 +102,19 @@ public class AppConfig {
     public static final String ACCELERATOR_CPU = "cpu";
     public static final String ACCELERATOR_GPU = "gpu";
     public static final String ACCELERATOR_NPU = "npu";
-    public static final String ACCELERATOR_DEFAULT = ACCELERATOR_GPU;
+
+    /**
+     * Returns true when running on a Google Tensor SoC (Pixel 6+), which has a dedicated NPU.
+     * Uses Build.SOC_MODEL (available from API 31 / Android 12) to detect GS* (Tensor G1–G3)
+     * and ZUMA* (Tensor G4) chip families.
+     */
+    public static boolean isGoogleTensorDevice() {
+        if (Build.VERSION.SDK_INT >= 31) {
+            String soc = Build.SOC_MODEL.toUpperCase(Locale.ROOT);
+            return soc.startsWith("GS") || soc.startsWith("ZUMA");
+        }
+        return false;
+    }
 
     private final SharedPreferences prefs;
     private final Gson gson;
@@ -336,7 +350,8 @@ public class AppConfig {
             boolean legacyGpu = prefs.getBoolean(KEY_ON_DEVICE_USE_GPU, true);
             return legacyGpu ? ACCELERATOR_GPU : ACCELERATOR_CPU;
         }
-        return prefs.getString(KEY_ON_DEVICE_ACCELERATOR, ACCELERATOR_DEFAULT);
+        String hardwareDefault = isGoogleTensorDevice() ? ACCELERATOR_NPU : ACCELERATOR_GPU;
+        return prefs.getString(KEY_ON_DEVICE_ACCELERATOR, hardwareDefault);
     }
 
     public void setOnDeviceAccelerator(String accelerator) {
