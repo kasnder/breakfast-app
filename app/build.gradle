@@ -10,8 +10,8 @@ android {
         applicationId "net.kollnig.breakfast"
         minSdk 24
         targetSdk 36
-        versionCode 26031702
-        versionName "0.0.1"
+        versionCode 26032101
+        versionName "0.0.2"
     }
 
     buildTypes {
@@ -46,5 +46,5 @@ dependencies {
     implementation 'com.google.code.gson:gson:2.13.2'
 
     // On-device LLM inference
-    implementation 'com.google.ai.edge.litertlm:litertlm-android:0.9.0-alpha03'
+    implementation 'com.google.ai.edge.litertlm:litertlm-android:0.9.0-beta'
 }
