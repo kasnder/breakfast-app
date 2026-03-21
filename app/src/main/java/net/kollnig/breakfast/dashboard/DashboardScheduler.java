@@ -37,7 +37,7 @@ public final class DashboardScheduler {
 
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
                 MORNING_WORK_NAME,
-                ExistingPeriodicWorkPolicy.UPDATE,
+                ExistingPeriodicWorkPolicy.CANCEL_AND_REENQUEUE,
                 request
         );
 

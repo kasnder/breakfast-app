@@ -94,6 +94,13 @@ public class SettingsActivity extends AppCompatActivity {
     private TextView briefingOpenAiTtsText;
     private List<String> moduleOrder = new ArrayList<>();
     private final Map<String, MaterialSwitch> moduleSwitches = new HashMap<>();
+    private MaterialSwitch switchOnDeviceLlm;
+    private MaterialSwitch switchOnDeviceGpu;
+    private MaterialSwitch switchLlmBenchmark;
+    private MaterialButton btnDownloadModel;
+    private TextView textOnDeviceLlmStatus;
+    private com.google.android.material.textfield.TextInputEditText inputHuggingfaceToken;
+    private android.widget.RadioGroup radioModelVariant;
     private boolean socialSettingsUnlocked;
     private boolean updatingSocialModuleSwitch;
 
@@ -164,6 +171,13 @@ public class SettingsActivity extends AppCompatActivity {
         morningRefreshTimeText = findViewById(R.id.text_morning_refresh_time);
         refreshButtonModeText = findViewById(R.id.text_news_refresh_mode);
         briefingOpenAiTtsText = findViewById(R.id.text_briefing_openai_tts);
+        switchOnDeviceLlm = findViewById(R.id.switch_on_device_llm);
+        switchOnDeviceGpu = findViewById(R.id.switch_on_device_gpu);
+        switchLlmBenchmark = findViewById(R.id.switch_llm_benchmark);
+        btnDownloadModel = findViewById(R.id.btn_download_model);
+        textOnDeviceLlmStatus = findViewById(R.id.text_on_device_llm_status);
+        inputHuggingfaceToken = findViewById(R.id.input_huggingface_token);
+        radioModelVariant = findViewById(R.id.radio_model_variant);
 
         // Add feed button
         findViewById(R.id.btn_add_feed).setOnClickListener(v -> showAddFeedDialog());
@@ -244,6 +258,35 @@ public class SettingsActivity extends AppCompatActivity {
             config.setBriefingUseOpenAiTtsEnabled(isChecked);
             updateBriefingTtsSummary();
         });
+        switchOnDeviceLlm.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            config.setOnDeviceLlmEnabled(isChecked);
+            updateOnDeviceModelStatus();
+            refreshFeedsList();
+        });
+        switchOnDeviceGpu.setOnCheckedChangeListener((buttonView, isChecked) ->
+                config.setOnDeviceUseGpu(isChecked));
+        switchLlmBenchmark.setOnCheckedChangeListener((buttonView, isChecked) ->
+                config.setLlmBenchmarkEnabled(isChecked));
+        inputHuggingfaceToken.addTextChangedListener(new android.text.TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override
+            public void afterTextChanged(android.text.Editable s) {
+                config.setHuggingFaceToken(s.toString());
+            }
+        });
+        radioModelVariant.setOnCheckedChangeListener((group, checkedId) -> {
+            String newVariant;
+            if (checkedId == R.id.radio_gemma_e2b) {
+                newVariant = AppConfig.MODEL_VARIANT_GEMMA_E2B;
+            } else {
+                newVariant = AppConfig.MODEL_VARIANT_GEMMA_1B;
+            }
+            handleModelVariantChange(newVariant);
+        });
+        btnDownloadModel.setOnClickListener(v -> startModelDownload());
     }
 
     private void loadSettings() {
@@ -264,6 +307,17 @@ public class SettingsActivity extends AppCompatActivity {
         switchMorningDelivery.setChecked(config.isMorningNotificationEnabled());
         switchEnableRefreshButton.setChecked(config.isRefreshButtonEnabled());
         switchBriefingOpenAiTts.setChecked(config.isBriefingUseOpenAiTtsEnabled());
+        switchOnDeviceLlm.setChecked(config.isOnDeviceLlmEnabled());
+        switchOnDeviceGpu.setChecked(config.isOnDeviceUseGpu());
+        switchLlmBenchmark.setChecked(config.isLlmBenchmarkEnabled());
+        inputHuggingfaceToken.setText(config.getHuggingFaceToken());
+        String variant = config.getOnDeviceModelVariant();
+        if (AppConfig.MODEL_VARIANT_GEMMA_E2B.equals(variant)) {
+            radioModelVariant.check(R.id.radio_gemma_e2b);
+        } else {
+            radioModelVariant.check(R.id.radio_gemma_1b);
+        }
+        updateOnDeviceModelStatus();
         moduleOrder = new ArrayList<>(config.getModuleOrder());
         updateMorningRefreshTimeText();
         updateRefreshButtonSummary();
@@ -584,6 +638,120 @@ public class SettingsActivity extends AppCompatActivity {
         } else {
             briefingOpenAiTtsText.setText("Breakfast reads the briefing with Android's on-device voice.");
         }
+    }
+
+    private void updateOnDeviceModelStatus() {
+        String variant = config.getOnDeviceModelVariant();
+        String modelPath = OnDeviceLlmClient.getModelPath(this, variant);
+
+        if (new java.io.File(modelPath).exists()) {
+            long sizeMb = new java.io.File(modelPath).length() / (1024 * 1024);
+            textOnDeviceLlmStatus.setText(String.format(getString(R.string.on_device_model_ready), sizeMb + " MB"));
+            btnDownloadModel.setText("Re-download model");
+        } else {
+            textOnDeviceLlmStatus.setText(R.string.on_device_model_not_downloaded);
+            String label = AppConfig.MODEL_VARIANT_GEMMA_E2B.equals(variant) ? "Gemma 3n E2B (~800 MB)" : "Gemma 1B (~557 MB)";
+            btnDownloadModel.setText("Download " + label);
+        }
+    }
+
+    private void handleModelVariantChange(String newVariant) {
+        String oldVariant = config.getOnDeviceModelVariant();
+        if (newVariant.equals(oldVariant)) {
+            return; // No change
+        }
+
+        config.setOnDeviceModelVariant(newVariant);
+        config.setOnDeviceModelPath(""); // Clear the saved path — new model needs to be downloaded
+        updateOnDeviceModelStatus();
+
+        // Delete the old model file to save space
+        String oldModelPath = OnDeviceLlmClient.getModelPath(this, oldVariant);
+        java.io.File oldModelFile = new java.io.File(oldModelPath);
+        if (oldModelFile.exists()) {
+            if (oldModelFile.delete()) {
+                android.widget.Toast.makeText(this, "Previous model deleted to save space", android.widget.Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+
+    private void startModelDownload() {
+        String variant = config.getOnDeviceModelVariant();
+        String modelPath = OnDeviceLlmClient.getModelPath(this, variant);
+        config.setOnDeviceModelPath(modelPath);
+        btnDownloadModel.setEnabled(false);
+        textOnDeviceLlmStatus.setText(String.format(getString(R.string.on_device_model_downloading), 0));
+
+        new Thread(() -> {
+            try {
+                java.io.File outputFile = new java.io.File(modelPath);
+                java.io.File tempFile = new java.io.File(modelPath + ".tmp");
+                String url;
+                if (AppConfig.MODEL_VARIANT_GEMMA_E2B.equals(variant)) {
+                    url = "https://huggingface.co/google/gemma-3n-E2B-it-litert-lm/resolve/main/"
+                            + "gemma-3n-E2B-it-int4.litertlm";
+                } else {
+                    url = "https://huggingface.co/litert-community/Gemma3-1B-IT/resolve/main/"
+                            + "Gemma3-1B-IT_multi-prefill-seq_q4_ekv4096.litertlm";
+                }
+
+                okhttp3.OkHttpClient downloadClient = new okhttp3.OkHttpClient.Builder()
+                        .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+                        .readTimeout(5, java.util.concurrent.TimeUnit.MINUTES)
+                        .build();
+                okhttp3.Request.Builder requestBuilder = new okhttp3.Request.Builder().url(url);
+                String token = config.getHuggingFaceToken();
+                if (token != null && !token.isEmpty()) {
+                    requestBuilder.header("Authorization", "Bearer " + token);
+                }
+                okhttp3.Request request = requestBuilder.build();
+                okhttp3.Response response = downloadClient.newCall(request).execute();
+
+                if (!response.isSuccessful() || response.body() == null) {
+                    throw new IOException("Download failed: HTTP " + response.code());
+                }
+
+                long contentLength = response.body().contentLength();
+                try (java.io.InputStream in = response.body().byteStream();
+                     java.io.FileOutputStream out = new java.io.FileOutputStream(tempFile)) {
+                    byte[] buffer = new byte[8192];
+                    long downloaded = 0;
+                    int lastPercent = 0;
+                    int read;
+                    while ((read = in.read(buffer)) != -1) {
+                        out.write(buffer, 0, read);
+                        downloaded += read;
+                        if (contentLength > 0) {
+                            int percent = (int) (downloaded * 100 / contentLength);
+                            if (percent != lastPercent) {
+                                lastPercent = percent;
+                                final int p = percent;
+                                runOnUiThread(() -> textOnDeviceLlmStatus.setText(
+                                        String.format(getString(R.string.on_device_model_downloading), p)));
+                            }
+                        }
+                    }
+                }
+
+                if (!tempFile.renameTo(outputFile)) {
+                    throw new IOException("Failed to move downloaded model into place");
+                }
+
+                runOnUiThread(() -> {
+                    btnDownloadModel.setEnabled(true);
+                    updateOnDeviceModelStatus();
+                    Toast.makeText(this, "Model downloaded successfully", Toast.LENGTH_SHORT).show();
+                });
+            } catch (Exception e) {
+                final String message = e.getMessage();
+                runOnUiThread(() -> {
+                    btnDownloadModel.setEnabled(true);
+                    textOnDeviceLlmStatus.setText(String.format(
+                            getString(R.string.on_device_model_download_failed), message));
+                    Toast.makeText(this, "Model download failed", Toast.LENGTH_SHORT).show();
+                });
+            }
+        }).start();
     }
 
     private static List<FeedPreset> buildFeedPresets() {

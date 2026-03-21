@@ -74,6 +74,12 @@ public class AppConfig {
     private static final String KEY_MODULE_ORDER = "module_order";
     private static final String KEY_WELCOME_DISMISSED = "welcome_dismissed";
     private static final String KEY_DASHBOARD_LAST_REFRESH = "dashboard_last_refresh";
+    private static final String KEY_ON_DEVICE_LLM_ENABLED = "on_device_llm_enabled";
+    private static final String KEY_ON_DEVICE_MODEL_PATH = "on_device_model_path";
+    private static final String KEY_ON_DEVICE_USE_GPU = "on_device_use_gpu";
+    private static final String KEY_ON_DEVICE_MODEL_VARIANT = "on_device_model_variant";
+    private static final String KEY_LLM_BENCHMARK_ENABLED = "llm_benchmark_enabled";
+    private static final String KEY_HUGGINGFACE_TOKEN = "huggingface_token";
     private static final String KEY_NEWS_CACHE_SCHEMA_VERSION = "news_cache_schema_version";
     private static final int NEWS_CACHE_SCHEMA_VERSION = 2;
 
@@ -83,6 +89,11 @@ public class AppConfig {
     public static final String MODULE_EMAIL = "email";
     public static final String MODULE_CALENDAR = "calendar";
     public static final String MODULE_TODOIST = "todoist";
+
+    // On-device LLM model variants
+    public static final String MODEL_VARIANT_GEMMA_1B = "gemma-1b";
+    public static final String MODEL_VARIANT_GEMMA_E2B = "gemma-e2b";
+    public static final String MODEL_VARIANT_DEFAULT = MODEL_VARIANT_GEMMA_1B;
 
     private final SharedPreferences prefs;
     private final Gson gson;
@@ -169,6 +180,10 @@ public class AppConfig {
                     migrated.add(new FeedConfig(url, false, true));
                 }
             }
+        }
+        // Persist the migrated format so we don't re-parse legacy data every time.
+        if (!migrated.isEmpty()) {
+            prefs.edit().putString(KEY_RSS_FEEDS, gson.toJson(migrated)).apply();
         }
         return migrated;
     }
@@ -288,6 +303,56 @@ public class AppConfig {
 
     public void setLlmModel(String model) {
         prefs.edit().putString(KEY_LLM_MODEL, model).apply();
+    }
+
+    // --- On-Device LLM Config ---
+
+    public boolean isOnDeviceLlmEnabled() {
+        return prefs.getBoolean(KEY_ON_DEVICE_LLM_ENABLED, false);
+    }
+
+    public void setOnDeviceLlmEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_ON_DEVICE_LLM_ENABLED, enabled).apply();
+    }
+
+    public String getOnDeviceModelPath() {
+        return prefs.getString(KEY_ON_DEVICE_MODEL_PATH, "");
+    }
+
+    public void setOnDeviceModelPath(String path) {
+        prefs.edit().putString(KEY_ON_DEVICE_MODEL_PATH, path).apply();
+    }
+
+    public boolean isOnDeviceUseGpu() {
+        return prefs.getBoolean(KEY_ON_DEVICE_USE_GPU, true);
+    }
+
+    public void setOnDeviceUseGpu(boolean useGpu) {
+        prefs.edit().putBoolean(KEY_ON_DEVICE_USE_GPU, useGpu).apply();
+    }
+
+    public String getOnDeviceModelVariant() {
+        return prefs.getString(KEY_ON_DEVICE_MODEL_VARIANT, MODEL_VARIANT_DEFAULT);
+    }
+
+    public void setOnDeviceModelVariant(String variant) {
+        prefs.edit().putString(KEY_ON_DEVICE_MODEL_VARIANT, variant).apply();
+    }
+
+    public String getHuggingFaceToken() {
+        return prefs.getString(KEY_HUGGINGFACE_TOKEN, "");
+    }
+
+    public void setHuggingFaceToken(String token) {
+        prefs.edit().putString(KEY_HUGGINGFACE_TOKEN, token).apply();
+    }
+
+    public boolean isLlmBenchmarkEnabled() {
+        return prefs.getBoolean(KEY_LLM_BENCHMARK_ENABLED, false);
+    }
+
+    public void setLlmBenchmarkEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_LLM_BENCHMARK_ENABLED, enabled).apply();
     }
 
     // --- Interest Profile ---
@@ -855,7 +920,13 @@ public class AppConfig {
     }
 
     public boolean isTopStoriesAvailable() {
-        return isLlmConfigured();
+        return isLlmConfigured() || isOnDeviceLlmReady();
+    }
+
+    public boolean isOnDeviceLlmReady() {
+        return isOnDeviceLlmEnabled()
+                && !getOnDeviceModelPath().isEmpty()
+                && new java.io.File(getOnDeviceModelPath()).exists();
     }
 
     public String exportSettingsJson() {

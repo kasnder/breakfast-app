@@ -55,6 +55,7 @@ public class LlmClient {
      */
     public List<ArticleData> rankAndSummarize(List<ArticleData> articles, String interestProfile, int count) {
         if (articles.isEmpty()) return new ArrayList<>();
+        long startMs = System.currentTimeMillis();
 
         try {
             // Build the prompt
@@ -148,10 +149,12 @@ public class LlmClient {
 
             // Sort by score descending
             Collections.sort(result, (a, b) -> Float.compare(b.interestScore, a.interestScore));
+            Log.i(TAG, "Cloud rankAndSummarize: " + result.size() + " articles in "
+                    + (System.currentTimeMillis() - startMs) + " ms");
             return result;
 
         } catch (Exception e) {
-            Log.e(TAG, "Error in LLM ranking", e);
+            Log.e(TAG, "Error in LLM ranking after " + (System.currentTimeMillis() - startMs) + " ms", e);
             return fallbackTopArticles(articles, count);
         }
     }

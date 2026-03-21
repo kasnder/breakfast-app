@@ -50,4 +50,8 @@
     <string name="add">Add</string>
     <string name="cancel">Cancel</string>
     <string name="settings_import_title">Import settings</string>
+    <string name="on_device_model_not_downloaded">Model not downloaded</string>
+    <string name="on_device_model_ready">Model ready (%s)</string>
+    <string name="on_device_model_downloading">Downloading model… %d%%</string>
+    <string name="on_device_model_download_failed">Download failed: %s</string>
 </resources>
