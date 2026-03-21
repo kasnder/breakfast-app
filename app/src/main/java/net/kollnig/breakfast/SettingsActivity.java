@@ -100,6 +100,7 @@ public class SettingsActivity extends AppCompatActivity {
     private MaterialButton btnDownloadModel;
     private TextView textOnDeviceLlmStatus;
     private com.google.android.material.textfield.TextInputEditText inputHuggingfaceToken;
+    private android.widget.RadioGroup radioModelVariant;
     private boolean socialSettingsUnlocked;
     private boolean updatingSocialModuleSwitch;
 
@@ -176,6 +177,7 @@ public class SettingsActivity extends AppCompatActivity {
         btnDownloadModel = findViewById(R.id.btn_download_model);
         textOnDeviceLlmStatus = findViewById(R.id.text_on_device_llm_status);
         inputHuggingfaceToken = findViewById(R.id.input_huggingface_token);
+        radioModelVariant = findViewById(R.id.radio_model_variant);
 
         // Add feed button
         findViewById(R.id.btn_add_feed).setOnClickListener(v -> showAddFeedDialog());
@@ -275,6 +277,15 @@ public class SettingsActivity extends AppCompatActivity {
                 config.setHuggingFaceToken(s.toString());
             }
         });
+        radioModelVariant.setOnCheckedChangeListener((group, checkedId) -> {
+            String newVariant;
+            if (checkedId == R.id.radio_gemma_e2b) {
+                newVariant = AppConfig.MODEL_VARIANT_GEMMA_E2B;
+            } else {
+                newVariant = AppConfig.MODEL_VARIANT_GEMMA_1B;
+            }
+            handleModelVariantChange(newVariant);
+        });
         btnDownloadModel.setOnClickListener(v -> startModelDownload());
     }
 
@@ -300,6 +311,12 @@ public class SettingsActivity extends AppCompatActivity {
         switchOnDeviceGpu.setChecked(config.isOnDeviceUseGpu());
         switchLlmBenchmark.setChecked(config.isLlmBenchmarkEnabled());
         inputHuggingfaceToken.setText(config.getHuggingFaceToken());
+        String variant = config.getOnDeviceModelVariant();
+        if (AppConfig.MODEL_VARIANT_GEMMA_E2B.equals(variant)) {
+            radioModelVariant.check(R.id.radio_gemma_e2b);
+        } else {
+            radioModelVariant.check(R.id.radio_gemma_1b);
+        }
         updateOnDeviceModelStatus();
         moduleOrder = new ArrayList<>(config.getModuleOrder());
         updateMorningRefreshTimeText();
@@ -624,22 +641,43 @@ public class SettingsActivity extends AppCompatActivity {
     }
 
     private void updateOnDeviceModelStatus() {
-        String modelPath = config.getOnDeviceModelPath();
-        if (modelPath.isEmpty()) {
-            modelPath = OnDeviceLlmClient.getDefaultModelPath(this);
-        }
+        String variant = config.getOnDeviceModelVariant();
+        String modelPath = OnDeviceLlmClient.getModelPath(this, variant);
+
         if (new java.io.File(modelPath).exists()) {
             long sizeMb = new java.io.File(modelPath).length() / (1024 * 1024);
             textOnDeviceLlmStatus.setText(String.format(getString(R.string.on_device_model_ready), sizeMb + " MB"));
             btnDownloadModel.setText("Re-download model");
         } else {
             textOnDeviceLlmStatus.setText(R.string.on_device_model_not_downloaded);
-            btnDownloadModel.setText("Download Gemma 1B model (~557 MB)");
+            String label = AppConfig.MODEL_VARIANT_GEMMA_E2B.equals(variant) ? "Gemma 3n E2B (~800 MB)" : "Gemma 1B (~557 MB)";
+            btnDownloadModel.setText("Download " + label);
+        }
+    }
+
+    private void handleModelVariantChange(String newVariant) {
+        String oldVariant = config.getOnDeviceModelVariant();
+        if (newVariant.equals(oldVariant)) {
+            return; // No change
+        }
+
+        config.setOnDeviceModelVariant(newVariant);
+        config.setOnDeviceModelPath(""); // Clear the saved path — new model needs to be downloaded
+        updateOnDeviceModelStatus();
+
+        // Delete the old model file to save space
+        String oldModelPath = OnDeviceLlmClient.getModelPath(this, oldVariant);
+        java.io.File oldModelFile = new java.io.File(oldModelPath);
+        if (oldModelFile.exists()) {
+            if (oldModelFile.delete()) {
+                android.widget.Toast.makeText(this, "Previous model deleted to save space", android.widget.Toast.LENGTH_SHORT).show();
+            }
         }
     }
 
     private void startModelDownload() {
-        String modelPath = OnDeviceLlmClient.getDefaultModelPath(this);
+        String variant = config.getOnDeviceModelVariant();
+        String modelPath = OnDeviceLlmClient.getModelPath(this, variant);
         config.setOnDeviceModelPath(modelPath);
         btnDownloadModel.setEnabled(false);
         textOnDeviceLlmStatus.setText(String.format(getString(R.string.on_device_model_downloading), 0));
@@ -648,8 +686,14 @@ public class SettingsActivity extends AppCompatActivity {
             try {
                 java.io.File outputFile = new java.io.File(modelPath);
                 java.io.File tempFile = new java.io.File(modelPath + ".tmp");
-                String url = "https://huggingface.co/litert-community/Gemma3-1B-IT/resolve/main/"
-                        + "Gemma3-1B-IT_multi-prefill-seq_q4_ekv4096.litertlm";
+                String url;
+                if (AppConfig.MODEL_VARIANT_GEMMA_E2B.equals(variant)) {
+                    url = "https://huggingface.co/google/gemma-3n-E2B-it-litert-lm/resolve/main/"
+                            + "gemma-3n-E2B-it-int4.litertlm";
+                } else {
+                    url = "https://huggingface.co/litert-community/Gemma3-1B-IT/resolve/main/"
+                            + "Gemma3-1B-IT_multi-prefill-seq_q4_ekv4096.litertlm";
+                }
 
                 okhttp3.OkHttpClient downloadClient = new okhttp3.OkHttpClient.Builder()
                         .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)

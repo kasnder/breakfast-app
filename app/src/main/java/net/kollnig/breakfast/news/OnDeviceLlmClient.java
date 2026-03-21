@@ -274,11 +274,23 @@ public class OnDeviceLlmClient {
     }
 
     /**
-     * Returns the default path for the Gemma3-1B model.
+     * Returns the model path for a given variant.
+     */
+    public static String getModelPath(Context context, String variant) {
+        String filename;
+        if ("gemma-e2b".equals(variant)) {
+            filename = "gemma-3n-E2B-it-int4.litertlm";
+        } else {
+            filename = "Gemma3-1B-IT_multi-prefill-seq_q4_ekv4096.litertlm";
+        }
+        return new File(getModelDirectory(context), filename).getAbsolutePath();
+    }
+
+    /**
+     * Returns the default path for the current model (uses 1B as default).
      */
     public static String getDefaultModelPath(Context context) {
-        return new File(getModelDirectory(context),
-                "Gemma3-1B-IT_multi-prefill-seq_q4_ekv4096.litertlm").getAbsolutePath();
+        return getModelPath(context, "gemma-1b");
     }
 
     // --- Helpers ---

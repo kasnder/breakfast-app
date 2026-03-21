@@ -460,7 +460,35 @@
                 android:text="Model not downloaded"
                 android:textAppearance="?attr/textAppearanceBodySmall"
                 android:textColor="@color/text_light"
-                android:layout_marginBottom="8dp" />
+                android:layout_marginBottom="12dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Model Variant"
+                android:textAppearance="?attr/textAppearanceBodySmall"
+                android:textColor="@color/text_light"
+                android:layout_marginBottom="4dp" />
+
+            <RadioGroup
+                android:id="@+id/radio_model_variant"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp">
+
+                <com.google.android.material.radiobutton.MaterialRadioButton
+                    android:id="@+id/radio_gemma_1b"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Gemma 3 1B (557 MB) — faster, less accurate" />
+
+                <com.google.android.material.radiobutton.MaterialRadioButton
+                    android:id="@+id/radio_gemma_e2b"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Gemma 3n E2B (≈800 MB) — better reasoning" />
+
+            </RadioGroup>
 
             <com.google.android.material.materialswitch.MaterialSwitch
                 android:id="@+id/switch_on_device_gpu"
