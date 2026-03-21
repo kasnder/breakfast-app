@@ -22,10 +22,13 @@ import java.util.List;
 public class OnDeviceTodoVoiceClient {
     private static final String TAG = "OnDeviceTodoVoice";
     private static final int JSON_RETRY_COUNT = 3;
-    private static final int SAMPLER_TOP_K = 40;
+    /** Maximum output tokens. A full JSON command response is 40–60 tokens; 150 gives safe headroom. */
+    private static final int MAX_OUTPUT_TOKENS = 150;
+    /** Low temperature keeps JSON output near-deterministic. */
+    private static final double SAMPLER_TEMPERATURE = 0.1;
+    /** Fully greedy on retries to maximise parse success. */
+    private static final double SAMPLER_TEMPERATURE_RETRY = 0.0;
     private static final double SAMPLER_TOP_P = 0.95;
-    private static final double INITIAL_TEMPERATURE = 0.1;
-    private static final double RETRY_TEMPERATURE = 0.0;
     private static final int SAMPLER_SEED = 0;
 
     private final Context context;
@@ -58,19 +61,21 @@ public class OnDeviceTodoVoiceClient {
             String previousInvalidJson = null;
             for (int attempt = 1; attempt <= JSON_RETRY_COUNT; attempt++) {
                 SamplerConfig samplerConfig = new SamplerConfig(
-                        SAMPLER_TOP_K,
+                        MAX_OUTPUT_TOKENS,
+                        attempt == 1 ? SAMPLER_TEMPERATURE : SAMPLER_TEMPERATURE_RETRY,
                         SAMPLER_TOP_P,
-                        attempt == 1 ? INITIAL_TEMPERATURE : RETRY_TEMPERATURE,
                         SAMPLER_SEED
                 );
                 ConversationConfig conversationConfig = new ConversationConfig(
                         Contents.Companion.of(
                                 "You transcribe audio of spoken todo commands and convert them into JSON. " +
-                                        "Return only JSON with keys: action, title, task_id, transcript. " +
+                                        "Return ONLY a raw JSON object with keys: action, title, task_id, transcript. " +
                                         "action must be one of add, complete, none. " +
                                         "Use task_id only when matching an existing todo to complete. " +
                                         "For add, put the spoken todo text into title in a cleaned-up form. " +
-                                        "If the intent is unclear, return action none."
+                                        "If the intent is unclear, return action none. " +
+                                        "Example: {\"action\":\"add\",\"title\":\"buy milk\",\"task_id\":\"\",\"transcript\":\"buy milk\"}. " +
+                                        "No markdown, no explanation, nothing else."
                         ),
                         Collections.emptyList(),
                         Collections.emptyList(),
@@ -152,19 +157,21 @@ public class OnDeviceTodoVoiceClient {
             String previousInvalidJson = null;
             for (int attempt = 1; attempt <= JSON_RETRY_COUNT; attempt++) {
                 SamplerConfig samplerConfig = new SamplerConfig(
-                        SAMPLER_TOP_K,
+                        MAX_OUTPUT_TOKENS,
+                        attempt == 1 ? SAMPLER_TEMPERATURE : SAMPLER_TEMPERATURE_RETRY,
                         SAMPLER_TOP_P,
-                        attempt == 1 ? INITIAL_TEMPERATURE : RETRY_TEMPERATURE,
                         SAMPLER_SEED
                 );
                 ConversationConfig conversationConfig = new ConversationConfig(
                         Contents.Companion.of(
                                 "You convert spoken todo commands into JSON. " +
-                                        "Return only JSON with keys: action, title, task_id, transcript. " +
+                                        "Return ONLY a raw JSON object with keys: action, title, task_id, transcript. " +
                                         "action must be one of add, complete, none. " +
                                         "Use task_id only when matching an existing todo to complete. " +
                                         "For add, put the spoken todo text into title in a cleaned-up form. " +
-                                        "If the intent is unclear, return action none."
+                                        "If the intent is unclear, return action none. " +
+                                        "Example: {\"action\":\"add\",\"title\":\"buy milk\",\"task_id\":\"\",\"transcript\":\"buy milk\"}. " +
+                                        "No markdown, no explanation, nothing else."
                         ),
                         Collections.emptyList(),
                         Collections.emptyList(),
