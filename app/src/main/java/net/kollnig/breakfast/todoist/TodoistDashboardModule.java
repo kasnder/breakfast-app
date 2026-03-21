@@ -27,6 +27,9 @@ import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
 
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -40,6 +43,8 @@ import java.util.TimeZone;
 import java.util.concurrent.ExecutorService;
 
 import android.content.pm.PackageManager;
+import android.media.AudioFormat;
+import android.media.AudioRecord;
 import android.media.MediaRecorder;
 
 public class TodoistDashboardModule {
@@ -87,9 +92,17 @@ public class TodoistDashboardModule {
     private final MaterialButton btnTodoistAdd;
     private final MaterialButton btnTodoistShowAll;
 
+    private static final int AUDIO_SAMPLE_RATE = 16000;
+    private static final int AUDIO_CHANNEL_CONFIG = AudioFormat.CHANNEL_IN_MONO;
+    private static final int AUDIO_ENCODING = AudioFormat.ENCODING_PCM_16BIT;
+    private static final int WAV_HEADER_SIZE = 44;
+    private static final int AUDIO_BUFFER_MULTIPLIER = 2;
+    private static final int RECORDING_THREAD_JOIN_TIMEOUT_MS = 5000;
+
     private List<TodoistTask> currentTodoistTasks = new ArrayList<>();
     private boolean todoistExpanded;
-    private MediaRecorder todoistRecorder;
+    private AudioRecord todoistAudioRecord;
+    private Thread todoistRecordingThread;
     private File todoistRecordingFile;
     private boolean todoistVoiceRecording;
 
@@ -239,7 +252,7 @@ public class TodoistDashboardModule {
     }
 
     public void release() {
-        releaseTodoistRecorder();
+        releaseAudioRecord();
     }
 
     public boolean isVoiceRecording() {
@@ -626,23 +639,49 @@ public class TodoistDashboardModule {
 
     private void startVoiceRecording() {
         try {
-            todoistRecordingFile = File.createTempFile("todoist-voice-", ".m4a", context.getCacheDir());
-            releaseTodoistRecorder();
-            todoistRecorder = new MediaRecorder();
-            todoistRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
-            todoistRecorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
-            todoistRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
-            todoistRecorder.setAudioSamplingRate(44100);
-            todoistRecorder.setAudioEncodingBitRate(96000);
-            todoistRecorder.setOutputFile(todoistRecordingFile.getAbsolutePath());
-            todoistRecorder.prepare();
-            todoistRecorder.start();
+            todoistRecordingFile = File.createTempFile("todoist-voice-", ".wav", context.getCacheDir());
+            releaseAudioRecord();
+            int minBufferSize = AudioRecord.getMinBufferSize(
+                    AUDIO_SAMPLE_RATE, AUDIO_CHANNEL_CONFIG, AUDIO_ENCODING);
+            final int bufferSize = minBufferSize * AUDIO_BUFFER_MULTIPLIER;
+            todoistAudioRecord = new AudioRecord(
+                    MediaRecorder.AudioSource.MIC,
+                    AUDIO_SAMPLE_RATE,
+                    AUDIO_CHANNEL_CONFIG,
+                    AUDIO_ENCODING,
+                    bufferSize);
+            if (todoistAudioRecord.getState() != AudioRecord.STATE_INITIALIZED) {
+                throw new IllegalStateException("AudioRecord failed to initialize");
+            }
+            todoistAudioRecord.startRecording();
             todoistVoiceRecording = true;
             optionsMenuInvalidator.invalidateOptionsMenu();
+
+            final File recordingFile = todoistRecordingFile;
+            final AudioRecord audioRecord = todoistAudioRecord;
+            todoistRecordingThread = new Thread(() -> {
+                try (FileOutputStream fos = new FileOutputStream(recordingFile)) {
+                    fos.write(new byte[WAV_HEADER_SIZE]); // placeholder for WAV header
+                    byte[] buffer = new byte[bufferSize];
+                    long totalBytes = 0;
+                    while (audioRecord.getRecordingState() == AudioRecord.RECORDSTATE_RECORDING) {
+                        int read = audioRecord.read(buffer, 0, buffer.length);
+                        if (read > 0) {
+                            fos.write(buffer, 0, read);
+                            totalBytes += read;
+                        }
+                    }
+                    fos.flush();
+                    writeWavHeader(recordingFile, totalBytes, AUDIO_SAMPLE_RATE, 1, 16);
+                } catch (Exception e) {
+                    Log.e(TAG, "Error writing audio recording", e);
+                }
+            });
+            todoistRecordingThread.start();
             Toast.makeText(context, "Recording voice todo...", Toast.LENGTH_SHORT).show();
         } catch (Exception e) {
             Log.e(TAG, "Unable to start voice recording", e);
-            releaseTodoistRecorder();
+            releaseAudioRecord();
             if (todoistRecordingFile != null) {
                 //noinspection ResultOfMethodCallIgnored
                 todoistRecordingFile.delete();
@@ -656,13 +695,20 @@ public class TodoistDashboardModule {
 
     private void stopVoiceRecording(boolean processCommand) {
         try {
-            if (todoistRecorder != null) {
-                todoistRecorder.stop();
+            if (todoistAudioRecord != null) {
+                todoistAudioRecord.stop();
+            }
+            if (todoistRecordingThread != null) {
+                try {
+                    todoistRecordingThread.join(RECORDING_THREAD_JOIN_TIMEOUT_MS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
             }
         } catch (RuntimeException e) {
             Log.e(TAG, "Unable to stop voice recording cleanly", e);
         } finally {
-            releaseTodoistRecorder();
+            releaseAudioRecord();
             todoistVoiceRecording = false;
             optionsMenuInvalidator.invalidateOptionsMenu();
         }
@@ -760,12 +806,45 @@ public class TodoistDashboardModule {
         });
     }
 
-    private void releaseTodoistRecorder() {
-        if (todoistRecorder != null) {
-            todoistRecorder.reset();
-            todoistRecorder.release();
-            todoistRecorder = null;
+    private void releaseAudioRecord() {
+        if (todoistAudioRecord != null) {
+            try {
+                todoistAudioRecord.release();
+            } catch (Exception e) {
+                Log.w(TAG, "Error releasing AudioRecord", e);
+            }
+            todoistAudioRecord = null;
         }
+        todoistRecordingThread = null;
+    }
+
+    private static void writeWavHeader(File file, long audioBytes, int sampleRate, int channels, int bitsPerSample) throws IOException {
+        long byteRate = (long) sampleRate * channels * bitsPerSample / 8;
+        int blockAlign = channels * bitsPerSample / 8;
+        try (RandomAccessFile raf = new RandomAccessFile(file, "rw")) {
+            raf.seek(0);
+            raf.write(new byte[]{'R', 'I', 'F', 'F'});
+            raf.write(intToLe((int) (audioBytes + 36)));
+            raf.write(new byte[]{'W', 'A', 'V', 'E'});
+            raf.write(new byte[]{'f', 'm', 't', ' '});
+            raf.write(intToLe(16));
+            raf.write(shortToLe((short) 1)); // PCM format
+            raf.write(shortToLe((short) channels));
+            raf.write(intToLe(sampleRate));
+            raf.write(intToLe((int) byteRate));
+            raf.write(shortToLe((short) blockAlign));
+            raf.write(shortToLe((short) bitsPerSample));
+            raf.write(new byte[]{'d', 'a', 't', 'a'});
+            raf.write(intToLe((int) audioBytes));
+        }
+    }
+
+    private static byte[] intToLe(int v) {
+        return new byte[]{(byte) v, (byte) (v >> 8), (byte) (v >> 16), (byte) (v >> 24)};
+    }
+
+    private static byte[] shortToLe(short v) {
+        return new byte[]{(byte) v, (byte) (v >> 8)};
     }
 
     private String findTodoTitleById(String taskId) {
