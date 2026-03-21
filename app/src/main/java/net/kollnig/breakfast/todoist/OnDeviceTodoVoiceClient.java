@@ -4,6 +4,7 @@ import android.content.Context;
 import android.util.Log;
 
 import com.google.ai.edge.litertlm.Backend;
+import com.google.ai.edge.litertlm.Content;
 import com.google.ai.edge.litertlm.Conversation;
 import com.google.ai.edge.litertlm.ConversationConfig;
 import com.google.ai.edge.litertlm.Contents;
@@ -14,6 +15,7 @@ import com.google.ai.edge.litertlm.SamplerConfig;
 
 import org.json.JSONObject;
 
+import java.io.File;
 import java.util.Collections;
 import java.util.List;
 
@@ -34,6 +36,100 @@ public class OnDeviceTodoVoiceClient {
         this.context = context.getApplicationContext();
         this.modelPath = modelPath;
         this.useGpu = useGpu;
+    }
+
+    public OpenAiTodoVoiceClient.VoiceTodoCommand interpretAudio(
+            File audioFile,
+            List<TodoistTask> tasks
+    ) throws Exception {
+        Engine engine = null;
+        try {
+            EngineConfig config = new EngineConfig(
+                    modelPath,
+                    useGpu ? new Backend.GPU() : new Backend.CPU(),
+                    null,
+                    new Backend.CPU(), // Audio processing uses CPU; GPU audio backend is not yet supported
+                    null,
+                    context.getCacheDir().getPath()
+            );
+            engine = new Engine(config);
+            engine.initialize();
+
+            String previousInvalidJson = null;
+            for (int attempt = 1; attempt <= JSON_RETRY_COUNT; attempt++) {
+                SamplerConfig samplerConfig = new SamplerConfig(
+                        SAMPLER_TOP_K,
+                        SAMPLER_TOP_P,
+                        attempt == 1 ? INITIAL_TEMPERATURE : RETRY_TEMPERATURE,
+                        SAMPLER_SEED
+                );
+                ConversationConfig conversationConfig = new ConversationConfig(
+                        Contents.Companion.of(
+                                "You transcribe audio of spoken todo commands and convert them into JSON. " +
+                                        "Return only JSON with keys: action, title, task_id, transcript. " +
+                                        "action must be one of add, complete, none. " +
+                                        "Use task_id only when matching an existing todo to complete. " +
+                                        "For add, put the spoken todo text into title in a cleaned-up form. " +
+                                        "If the intent is unclear, return action none."
+                        ),
+                        Collections.emptyList(),
+                        Collections.emptyList(),
+                        samplerConfig,
+                        null,
+                        false
+                );
+
+                StringBuilder taskList = new StringBuilder();
+                taskList.append("Open tasks:\n");
+                for (TodoistTask task : tasks) {
+                    taskList.append("- id=").append(task.id)
+                            .append(", title=").append(task.content)
+                            .append("\n");
+                }
+                if (previousInvalidJson != null) {
+                    taskList.append("\nPrevious output was invalid JSON. ");
+                    taskList.append("Retry and return valid JSON only. Invalid output:\n");
+                    taskList.append(previousInvalidJson);
+                }
+
+                try (Conversation conversation = engine.createConversation(conversationConfig)) {
+                    Message response = conversation.sendMessage(
+                            Contents.Companion.of(
+                                    new Content.AudioFile(audioFile.getAbsolutePath()),
+                                    new Content.Text(taskList.toString())
+                            ),
+                            Collections.emptyMap()
+                    );
+                    String cleaned = stripMarkdownCodeFences(response.toString());
+                    try {
+                        JSONObject commandJson = new JSONObject(cleaned);
+                        OpenAiTodoVoiceClient.VoiceTodoCommand command = new OpenAiTodoVoiceClient.VoiceTodoCommand();
+                        command.action = commandJson.optString("action", "none");
+                        command.title = commandJson.optString("title", "");
+                        command.taskId = commandJson.optString("task_id", "");
+                        command.transcript = commandJson.optString("transcript", "");
+                        return command;
+                    } catch (Exception parseError) {
+                        previousInvalidJson = cleaned;
+                        if (attempt == JSON_RETRY_COUNT) {
+                            throw parseError;
+                        }
+                    }
+                }
+            }
+            throw new IllegalStateException("On-device audio todo command parsing failed");
+        } catch (Exception e) {
+            Log.e(TAG, "On-device audio todo command parsing failed", e);
+            throw e;
+        } finally {
+            if (engine != null) {
+                try {
+                    engine.close();
+                } catch (Exception closeError) {
+                    Log.w(TAG, "Error closing on-device audio voice engine", closeError);
+                }
+            }
+        }
     }
 
     public OpenAiTodoVoiceClient.VoiceTodoCommand interpretTranscript(

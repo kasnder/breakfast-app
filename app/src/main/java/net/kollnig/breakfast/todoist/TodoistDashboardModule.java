@@ -10,7 +10,6 @@ import net.kollnig.breakfast.weather.*;
 
 import android.Manifest;
 import android.content.Context;
-import android.content.Intent;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -42,8 +41,6 @@ import java.util.concurrent.ExecutorService;
 
 import android.content.pm.PackageManager;
 import android.media.MediaRecorder;
-import android.speech.RecognizerIntent;
-import android.speech.SpeechRecognizer;
 
 public class TodoistDashboardModule {
     public interface MainThreadPoster {
@@ -70,10 +67,6 @@ public class TodoistDashboardModule {
         void requestAudioPermission();
     }
 
-    public interface SpeechRecognitionLauncher {
-        void launch(Intent intent);
-    }
-
     private static final String TAG = "TodoistModule";
 
     private final Context context;
@@ -87,7 +80,6 @@ public class TodoistDashboardModule {
     private final OptionsMenuInvalidator optionsMenuInvalidator;
     private final ActionFailureNotifier actionFailureNotifier;
     private final AudioPermissionRequester audioPermissionRequester;
-    private final SpeechRecognitionLauncher speechRecognitionLauncher;
     private final TextView todoistStatus;
     private final TextView todoistHint;
     private final ProgressBar todoistLoading;
@@ -106,8 +98,7 @@ public class TodoistDashboardModule {
                                   RelativeTimeFormatter relativeTimeFormatter,
                                   SettingsOpener settingsOpener, ArticleOpener articleOpener,
                                   OptionsMenuInvalidator optionsMenuInvalidator,
-                                  AudioPermissionRequester audioPermissionRequester,
-                                  SpeechRecognitionLauncher speechRecognitionLauncher) {
+                                  AudioPermissionRequester audioPermissionRequester) {
         this.context = context;
         this.rootView = rootView;
         this.config = config;
@@ -119,7 +110,6 @@ public class TodoistDashboardModule {
         this.optionsMenuInvalidator = optionsMenuInvalidator;
         this.actionFailureNotifier = new ActionFailureNotifier(context);
         this.audioPermissionRequester = audioPermissionRequester;
-        this.speechRecognitionLauncher = speechRecognitionLauncher;
         this.todoistStatus = rootView.findViewById(R.id.todoist_status);
         this.todoistHint = rootView.findViewById(R.id.todoist_hint);
         this.todoistLoading = rootView.findViewById(R.id.todoist_loading);
@@ -221,11 +211,6 @@ public class TodoistDashboardModule {
             return;
         }
 
-        if (config.isOnDeviceLlmReady()) {
-            launchSpeechRecognition();
-            return;
-        }
-
         if (todoistVoiceRecording) {
             stopVoiceRecording(true);
             return;
@@ -237,50 +222,6 @@ public class TodoistDashboardModule {
         } else {
             audioPermissionRequester.requestAudioPermission();
         }
-    }
-
-    private void launchSpeechRecognition() {
-        if (!SpeechRecognizer.isRecognitionAvailable(context)) {
-            Toast.makeText(context, "Speech recognition is not available on this device.", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
-        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
-        intent.putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true);
-        intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false);
-        intent.putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak your todo command");
-        speechRecognitionLauncher.launch(intent);
-    }
-
-    public void onSpeechRecognitionResult(String transcript) {
-        String cleaned = transcript == null ? "" : transcript.trim();
-        if (cleaned.isEmpty()) {
-            Toast.makeText(context, "I couldn’t hear a todo command.", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        processOnDeviceTranscript(cleaned);
-    }
-
-    private void processOnDeviceTranscript(String transcript) {
-        todoistLoading.setVisibility(View.VISIBLE);
-        executor.execute(() -> {
-            try {
-                OnDeviceTodoVoiceClient onDeviceClient = new OnDeviceTodoVoiceClient(
-                        context,
-                        config.getOnDeviceModelPath(),
-                        config.isOnDeviceUseGpu()
-                );
-                OpenAiTodoVoiceClient.VoiceTodoCommand command =
-                        onDeviceClient.interpretTranscript(transcript, currentTodoistTasks);
-                applyVoiceCommand(command);
-            } catch (Exception e) {
-                Log.e(TAG, "Error processing on-device voice todo command", e);
-                mainThreadPoster.post(() -> {
-                    todoistLoading.setVisibility(View.GONE);
-                    Toast.makeText(context, "Voice todo failed with on-device model.", Toast.LENGTH_SHORT).show();
-                });
-            }
-        });
     }
 
     public void onAudioPermissionResult(boolean granted) {
@@ -742,13 +683,22 @@ public class TodoistDashboardModule {
         todoistLoading.setVisibility(View.VISIBLE);
         executor.execute(() -> {
             try {
-                OpenAiTodoVoiceClient voiceClient = new OpenAiTodoVoiceClient(
-                        config.getLlmBaseUrl(),
-                        config.getLlmApiKey(),
-                        config.getLlmModel()
-                );
-                OpenAiTodoVoiceClient.VoiceTodoCommand command =
-                        voiceClient.transcribeAndInterpret(audioFile, currentTodoistTasks);
+                OpenAiTodoVoiceClient.VoiceTodoCommand command;
+                if (config.isOnDeviceLlmReady()) {
+                    OnDeviceTodoVoiceClient onDeviceClient = new OnDeviceTodoVoiceClient(
+                            context,
+                            config.getOnDeviceModelPath(),
+                            config.isOnDeviceUseGpu()
+                    );
+                    command = onDeviceClient.interpretAudio(audioFile, currentTodoistTasks);
+                } else {
+                    OpenAiTodoVoiceClient voiceClient = new OpenAiTodoVoiceClient(
+                            config.getLlmBaseUrl(),
+                            config.getLlmApiKey(),
+                            config.getLlmModel()
+                    );
+                    command = voiceClient.transcribeAndInterpret(audioFile, currentTodoistTasks);
+                }
                 //noinspection ResultOfMethodCallIgnored
                 audioFile.delete();
                 todoistRecordingFile = null;
