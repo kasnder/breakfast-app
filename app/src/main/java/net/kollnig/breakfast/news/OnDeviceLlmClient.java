@@ -163,7 +163,7 @@ public class OnDeviceLlmClient {
                     + "\nArticle description: " + truncate(article.originalDescription, descLimit())
                     + "\n\nRelevance score (0.0-1.0):";
 
-            SamplerConfig samplerConfig = new SamplerConfig(1, 0.95, 0.1, 0);
+            SamplerConfig samplerConfig = new SamplerConfig(1, 1.0, 0.0, 0);
             ConversationConfig convConfig = new ConversationConfig(
                     Contents.Companion.of(systemPrompt),
                     Collections.emptyList(),
@@ -196,7 +196,7 @@ public class OnDeviceLlmClient {
                     + "\nDescription: " + truncate(article.originalDescription, descLimit())
                     + "\n\nSummary:";
 
-            SamplerConfig samplerConfig = new SamplerConfig(10, 0.95, 0.3, 0);
+            SamplerConfig samplerConfig = new SamplerConfig(40, 0.95, 0.2, 0);
             ConversationConfig convConfig = new ConversationConfig(
                     Contents.Companion.of(systemPrompt),
                     Collections.emptyList(),
@@ -242,7 +242,7 @@ public class OnDeviceLlmClient {
             String userPrompt = "Dashboard data:\n\n" + trimmedData
                     + "\n\nWrite a brief spoken morning briefing script:";
 
-            SamplerConfig samplerConfig = new SamplerConfig(10, 0.95, 0.4, 0);
+            SamplerConfig samplerConfig = new SamplerConfig(40, 0.95, 0.7, 0);
             ConversationConfig convConfig = new ConversationConfig(
                     Contents.Companion.of(systemPrompt),
                     Collections.emptyList(),
