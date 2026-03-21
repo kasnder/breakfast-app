@@ -26,7 +26,7 @@ import okhttp3.RequestBody;
 import okhttp3.Response;
 
 public class OpenAiTodoVoiceClient {
-    private static final MediaType AUDIO_M4A = MediaType.get("audio/mp4");
+    private static final MediaType AUDIO_WAV = MediaType.get("audio/wav");
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
     private static final String FALLBACK_TRANSCRIPTION_MODEL = "gpt-4o-mini-transcribe";
     private static final int INTERPRET_RETRY_COUNT = 3;
@@ -69,7 +69,7 @@ public class OpenAiTodoVoiceClient {
                     .addFormDataPart(
                             "file",
                             audioFile.getName(),
-                            RequestBody.create(audioFile, AUDIO_M4A)
+                            RequestBody.create(audioFile, AUDIO_WAV)
                     )
                     .build();
 
