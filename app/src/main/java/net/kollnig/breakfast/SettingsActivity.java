@@ -69,9 +69,6 @@ public class SettingsActivity extends AppCompatActivity {
     private TextInputEditText inputTimerDuration;
     private TextInputEditText inputFrictionWords;
     private TextInputEditText inputArticleCount;
-    private TextInputEditText inputLlmUrl;
-    private TextInputEditText inputLlmKey;
-    private TextInputEditText inputLlmModel;
     private TextInputEditText inputInterests;
     private TextInputEditText inputTodoistApiKey;
     private TextInputEditText inputTodoistProjectId;
@@ -86,17 +83,14 @@ public class SettingsActivity extends AppCompatActivity {
     private MaterialButton btnGrantCalendarAccess;
     private MaterialSwitch switchMorningDelivery;
     private MaterialSwitch switchEnableRefreshButton;
-    private MaterialSwitch switchBriefingOpenAiTts;
     private TextView calendarPermissionStatus;
     private TextView socialModuleLockHint;
     private TextView morningRefreshTimeText;
     private TextView refreshButtonModeText;
-    private TextView briefingOpenAiTtsText;
     private List<String> moduleOrder = new ArrayList<>();
     private final Map<String, MaterialSwitch> moduleSwitches = new HashMap<>();
     private MaterialSwitch switchOnDeviceLlm;
     private MaterialSwitch switchOnDeviceGpu;
-    private MaterialSwitch switchLlmBenchmark;
     private MaterialButton btnDownloadModel;
     private TextView textOnDeviceLlmStatus;
     private com.google.android.material.textfield.TextInputEditText inputHuggingfaceToken;
@@ -148,9 +142,6 @@ public class SettingsActivity extends AppCompatActivity {
         inputTimerDuration = findViewById(R.id.input_timer_duration);
         inputFrictionWords = findViewById(R.id.input_friction_words);
         inputArticleCount = findViewById(R.id.input_article_count);
-        inputLlmUrl = findViewById(R.id.input_llm_url);
-        inputLlmKey = findViewById(R.id.input_llm_key);
-        inputLlmModel = findViewById(R.id.input_llm_model);
         inputInterests = findViewById(R.id.input_interests);
         inputTodoistApiKey = findViewById(R.id.input_todoist_key);
         inputTodoistProjectId = findViewById(R.id.input_todoist_project_id);
@@ -165,15 +156,12 @@ public class SettingsActivity extends AppCompatActivity {
         btnGrantCalendarAccess = findViewById(R.id.btn_grant_calendar_access);
         switchMorningDelivery = findViewById(R.id.switch_morning_delivery);
         switchEnableRefreshButton = findViewById(R.id.switch_news_refresh_on_open);
-        switchBriefingOpenAiTts = findViewById(R.id.switch_briefing_openai_tts);
         calendarPermissionStatus = findViewById(R.id.calendar_permission_status);
         socialModuleLockHint = findViewById(R.id.text_social_module_lock_hint);
         morningRefreshTimeText = findViewById(R.id.text_morning_refresh_time);
         refreshButtonModeText = findViewById(R.id.text_news_refresh_mode);
-        briefingOpenAiTtsText = findViewById(R.id.text_briefing_openai_tts);
         switchOnDeviceLlm = findViewById(R.id.switch_on_device_llm);
         switchOnDeviceGpu = findViewById(R.id.switch_on_device_gpu);
-        switchLlmBenchmark = findViewById(R.id.switch_llm_benchmark);
         btnDownloadModel = findViewById(R.id.btn_download_model);
         textOnDeviceLlmStatus = findViewById(R.id.text_on_device_llm_status);
         inputHuggingfaceToken = findViewById(R.id.input_huggingface_token);
@@ -218,15 +206,6 @@ public class SettingsActivity extends AppCompatActivity {
             try { config.setArticleCount(Integer.parseInt(inputArticleCount.getText().toString().trim())); }
             catch (NumberFormatException ignored) {}
         });
-        setupAutoSave(inputLlmUrl, () -> {
-            config.setLlmBaseUrl(inputLlmUrl.getText().toString().trim());
-            refreshFeedsList();
-        });
-        setupAutoSave(inputLlmKey, () -> {
-            config.setLlmApiKey(inputLlmKey.getText().toString().trim());
-            refreshFeedsList();
-        });
-        setupAutoSave(inputLlmModel, () -> config.setLlmModel(inputLlmModel.getText().toString().trim()));
         setupAutoSave(inputInterests, () -> config.setInterestProfile(inputInterests.getText().toString().trim()));
         setupAutoSave(inputTodoistApiKey, () -> {
             config.setTodoistApiKey(inputTodoistApiKey.getText().toString().trim());
@@ -254,10 +233,6 @@ public class SettingsActivity extends AppCompatActivity {
             config.setRefreshButtonEnabled(isChecked);
             updateRefreshButtonSummary();
         });
-        switchBriefingOpenAiTts.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            config.setBriefingUseOpenAiTtsEnabled(isChecked);
-            updateBriefingTtsSummary();
-        });
         switchOnDeviceLlm.setOnCheckedChangeListener((buttonView, isChecked) -> {
             config.setOnDeviceLlmEnabled(isChecked);
             updateOnDeviceModelStatus();
@@ -265,8 +240,6 @@ public class SettingsActivity extends AppCompatActivity {
         });
         switchOnDeviceGpu.setOnCheckedChangeListener((buttonView, isChecked) ->
                 config.setOnDeviceUseGpu(isChecked));
-        switchLlmBenchmark.setOnCheckedChangeListener((buttonView, isChecked) ->
-                config.setLlmBenchmarkEnabled(isChecked));
         inputHuggingfaceToken.addTextChangedListener(new android.text.TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
@@ -295,9 +268,6 @@ public class SettingsActivity extends AppCompatActivity {
         inputTimerDuration.setText(String.valueOf(config.getTimerDurationMins()));
         inputFrictionWords.setText(String.valueOf(config.getFrictionWordCount()));
         inputArticleCount.setText(String.valueOf(config.getArticleCount()));
-        inputLlmUrl.setText(config.getLlmBaseUrl());
-        inputLlmKey.setText(config.getLlmApiKey());
-        inputLlmModel.setText(config.getLlmModel());
         inputInterests.setText(config.getInterestProfile());
         inputTodoistApiKey.setText(config.getTodoistApiKey());
         inputTodoistProjectId.setText(config.getTodoistProjectId());
@@ -306,10 +276,8 @@ public class SettingsActivity extends AppCompatActivity {
         checkboxSocialPressHome.setChecked(config.shouldPressHomeWhenSocialTimeIsUp());
         switchMorningDelivery.setChecked(config.isMorningNotificationEnabled());
         switchEnableRefreshButton.setChecked(config.isRefreshButtonEnabled());
-        switchBriefingOpenAiTts.setChecked(config.isBriefingUseOpenAiTtsEnabled());
         switchOnDeviceLlm.setChecked(config.isOnDeviceLlmEnabled());
         switchOnDeviceGpu.setChecked(config.isOnDeviceUseGpu());
-        switchLlmBenchmark.setChecked(config.isLlmBenchmarkEnabled());
         inputHuggingfaceToken.setText(config.getHuggingFaceToken());
         String variant = config.getOnDeviceModelVariant();
         if (AppConfig.MODEL_VARIANT_GEMMA_E2B.equals(variant)) {
@@ -321,7 +289,6 @@ public class SettingsActivity extends AppCompatActivity {
         moduleOrder = new ArrayList<>(config.getModuleOrder());
         updateMorningRefreshTimeText();
         updateRefreshButtonSummary();
-        updateBriefingTtsSummary();
         refreshModuleOrderList();
         refreshFeedsList();
         refreshSocialSettingsLock();
@@ -342,9 +309,6 @@ public class SettingsActivity extends AppCompatActivity {
         catch (NumberFormatException ignored) {}
         try { config.setArticleCount(Integer.parseInt(inputArticleCount.getText().toString().trim())); }
         catch (NumberFormatException ignored) {}
-        config.setLlmBaseUrl(inputLlmUrl.getText().toString().trim());
-        config.setLlmApiKey(inputLlmKey.getText().toString().trim());
-        config.setLlmModel(inputLlmModel.getText().toString().trim());
         config.setInterestProfile(inputInterests.getText().toString().trim());
         config.setTodoistApiKey(inputTodoistApiKey.getText().toString().trim());
         config.setTodoistProjectId(inputTodoistProjectId.getText().toString().trim());
@@ -353,7 +317,6 @@ public class SettingsActivity extends AppCompatActivity {
         config.setPressHomeWhenSocialTimeIsUp(checkboxSocialPressHome.isChecked());
         config.setMorningNotificationEnabled(switchMorningDelivery.isChecked());
         config.setRefreshButtonEnabled(switchEnableRefreshButton.isChecked());
-        config.setBriefingUseOpenAiTtsEnabled(switchBriefingOpenAiTts.isChecked());
         config.setModuleOrder(moduleOrder);
         DashboardScheduler.scheduleMorningRefresh(this);
     }
@@ -629,14 +592,6 @@ public class SettingsActivity extends AppCompatActivity {
             refreshButtonModeText.setText("Show a refresh button in the toolbar so you can manually reload the dashboard whenever you want.");
         } else {
             refreshButtonModeText.setText("Hide the toolbar refresh button. Breakfast will still refresh on its normal schedule in the background.");
-        }
-    }
-
-    private void updateBriefingTtsSummary() {
-        if (config.isBriefingUseOpenAiTtsEnabled()) {
-            briefingOpenAiTtsText.setText("Breakfast will try the OpenAI speech endpoint for the play button and fall back to Android voice if it fails.");
-        } else {
-            briefingOpenAiTtsText.setText("Breakfast reads the briefing with Android's on-device voice.");
         }
     }
 

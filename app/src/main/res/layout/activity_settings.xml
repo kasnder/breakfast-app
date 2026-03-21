@@ -364,69 +364,10 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Connect to any OpenAI-compatible API to rank and summarize recent articles from the feeds you mark for the AI briefing."
+                android:text="Breakfast uses on-device models to rank and summarize recent articles from the feeds you mark for the AI briefing."
                 android:textAppearance="?attr/textAppearanceBodySmall"
                 android:textColor="@color/text_light"
-                android:layout_marginBottom="12dp" />
-
-            <com.google.android.material.materialswitch.MaterialSwitch
-                android:id="@+id/switch_briefing_openai_tts"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Use OpenAI voice for the briefing"
-                android:layout_marginBottom="4dp" />
-
-            <TextView
-                android:id="@+id/text_briefing_openai_tts"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="If this is off, Breakfast reads the briefing with Android's on-device voice."
-                android:textAppearance="?attr/textAppearanceBodySmall"
-                android:textColor="@color/text_light"
-                android:layout_marginBottom="12dp" />
-
-            <com.google.android.material.textfield.TextInputLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="API base URL"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                android:layout_marginBottom="8dp">
-
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/input_llm_url"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:inputType="textUri" />
-            </com.google.android.material.textfield.TextInputLayout>
-
-            <com.google.android.material.textfield.TextInputLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="API key"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                app:endIconMode="password_toggle"
-                android:layout_marginBottom="8dp">
-
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/input_llm_key"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:inputType="textPassword" />
-            </com.google.android.material.textfield.TextInputLayout>
-
-            <com.google.android.material.textfield.TextInputLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="Model name"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                android:layout_marginBottom="24dp">
-
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/input_llm_model"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:inputType="text" />
-            </com.google.android.material.textfield.TextInputLayout>
+                android:layout_marginBottom="24dp" />
 
             <!-- On-Device LLM Section -->
             <TextView
@@ -528,20 +469,9 @@
                 android:text="Download Gemma 1B model (~557 MB)"
                 android:layout_marginBottom="8dp" />
 
-            <com.google.android.material.materialswitch.MaterialSwitch
-                android:id="@+id/switch_llm_benchmark"
+            <View
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Run cloud vs device comparison on refresh"
-                android:layout_marginBottom="4dp" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="When enabled, each refresh runs both backends and logs a comparison. View with: adb logcat -s LlmBenchmark"
-                android:textAppearance="?attr/textAppearanceBodySmall"
-                android:textColor="@color/text_light"
-                android:layout_marginBottom="24dp" />
+                android:layout_height="24dp" />
 
             <!-- Interest Profile Section -->
             <TextView

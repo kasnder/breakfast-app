@@ -693,7 +693,7 @@ public class TodoistDashboardModule {
                 todoistRecordingFile = null;
                 mainThreadPoster.post(() -> {
                     todoistLoading.setVisibility(View.GONE);
-                    Toast.makeText(context, "Voice todos are currently unavailable without OpenAI.", Toast.LENGTH_LONG).show();
+                    Toast.makeText(context, "Voice todos are currently unavailable.", Toast.LENGTH_LONG).show();
                 });
             } catch (Exception e) {
                 Log.e(TAG, "Error processing voice todo command", e);

@@ -28,7 +28,6 @@
     <string name="briefing_audio_idle">Listen to today\'s briefing</string>
     <string name="briefing_audio_playing">Reading today\'s briefing aloud</string>
     <string name="briefing_audio_writing">Writing your spoken briefing...</string>
-    <string name="briefing_audio_loading">Generating OpenAI voice...</string>
     <string name="briefing_audio_unavailable">On-device speech is unavailable on this device.</string>
     <string name="briefing_audio_empty">Refresh your AI briefing to listen to it.</string>
     <string name="todoist_add">Add</string>
