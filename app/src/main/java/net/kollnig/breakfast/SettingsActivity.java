@@ -707,7 +707,7 @@ public class SettingsActivity extends AppCompatActivity {
                 okhttp3.Request request = requestBuilder.build();
                 okhttp3.Response response = downloadClient.newCall(request).execute();
 
-                if (!response.isSuccessful() || response.body() == null) {
+                if (!response.isSuccessful()) {
                     throw new IOException("Download failed: HTTP " + response.code());
                 }
 
