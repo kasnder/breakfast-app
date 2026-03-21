@@ -61,7 +61,7 @@ public class OnDeviceLlmClient {
 
     /**
      * Characters of fixed formatting per article inside a batch prompt
-     * ("[N] Title: \nDescription: \n\n" is roughly 30 chars).
+     * ("N. Title: \nDescription: \n\n" is roughly 30 chars).
      */
     private static final int ARTICLE_PROMPT_FORMATTING_CHARS = 30;
 
@@ -316,7 +316,7 @@ public class OnDeviceLlmClient {
             String systemPrompt = "You are a relevance scorer. "
                     + "Given user interests and a numbered list of articles, respond with ONLY "
                     + "a numbered list of relevance scores from 0.0 to 1.0, one per line in the "
-                    + "format \"N: score\". Nothing else.";
+                    + "format \"N: score\" (example: \"1: 0.85\"). Nothing else.";
 
             StringBuilder userPrompt = new StringBuilder();
             userPrompt.append("User interests: ")
@@ -324,7 +324,7 @@ public class OnDeviceLlmClient {
                       .append("\n\nArticles:\n");
             for (int i = 0; i < batch.size(); i++) {
                 ArticleData a = batch.get(i);
-                userPrompt.append("[").append(i + 1).append("] Title: ")
+                userPrompt.append(i + 1).append(". Title: ")
                           .append(truncate(a.title, 300))
                           .append("\nDescription: ")
                           .append(truncate(a.originalDescription, descLimit()))
@@ -434,7 +434,7 @@ public class OnDeviceLlmClient {
                     + "\nArticle description: " + truncate(article.originalDescription, descLimit())
                     + "\n\nRelevance score (0.0-1.0):";
 
-            SamplerConfig samplerConfig = new SamplerConfig(1, 1.0, 0.0, 0);
+            SamplerConfig samplerConfig = new SamplerConfig(OUTPUT_TOKENS_PER_SCORE, 1.0, 0.0, 0);
             ConversationConfig convConfig = new ConversationConfig(
                     Contents.Companion.of(systemPrompt),
                     Collections.emptyList(),
@@ -480,12 +480,13 @@ public class OnDeviceLlmClient {
         try {
             String systemPrompt = "You are a concise news summarizer. "
                     + "For each numbered article, write a 1-2 sentence factual summary. "
-                    + "Respond with ONLY a numbered list in the format \"N: summary\". Nothing else.";
+                    + "Respond with ONLY a numbered list in the format \"N: summary\" "
+                    + "(example: \"1: Scientists discover…\"). Nothing else.";
 
             StringBuilder userPrompt = new StringBuilder("Articles:\n");
             for (int i = 0; i < batch.size(); i++) {
                 ArticleData a = batch.get(i);
-                userPrompt.append("[").append(i + 1).append("] Title: ")
+                userPrompt.append(i + 1).append(". Title: ")
                           .append(truncate(a.title, 300))
                           .append("\nDescription: ")
                           .append(truncate(a.originalDescription, descLimit()))
@@ -583,7 +584,8 @@ public class OnDeviceLlmClient {
     private String summarizeArticleSingle(ArticleData article) {
         try {
             String systemPrompt = "You are a concise news summarizer. "
-                    + "Summarize the article in 1-2 sentences. Be factual and brief.";
+                    + "Summarize the article in 1-2 sentences. Be factual and brief. "
+                    + "Respond with ONLY the summary text. Nothing else.";
 
             String userPrompt = "Title: " + truncate(article.title, 300)
                     + "\nDescription: " + truncate(article.originalDescription, descLimit())
