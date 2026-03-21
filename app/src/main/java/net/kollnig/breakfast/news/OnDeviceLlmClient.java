@@ -61,7 +61,7 @@ public class OnDeviceLlmClient {
 
         Backend backend;
         if (AppConfig.ACCELERATOR_NPU.equals(acceleratorType)) {
-            backend = new Backend.GoogleTensorNpu();
+            backend = new Backend.NPU();
         } else if (AppConfig.ACCELERATOR_GPU.equals(acceleratorType)) {
             backend = new Backend.GPU();
         } else {

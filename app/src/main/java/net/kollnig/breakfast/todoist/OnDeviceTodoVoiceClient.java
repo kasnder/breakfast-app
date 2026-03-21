@@ -241,7 +241,7 @@ public class OnDeviceTodoVoiceClient {
 
     private Backend buildTextBackend() {
         if (AppConfig.ACCELERATOR_NPU.equals(acceleratorType)) {
-            return new Backend.GoogleTensorNpu();
+            return new Backend.NPU();
         } else if (AppConfig.ACCELERATOR_GPU.equals(acceleratorType)) {
             return new Backend.GPU();
         } else {
