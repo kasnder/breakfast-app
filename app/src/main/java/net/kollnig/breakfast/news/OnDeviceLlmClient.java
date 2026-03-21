@@ -13,6 +13,7 @@ import com.google.ai.edge.litertlm.Message;
 import com.google.ai.edge.litertlm.SamplerConfig;
 
 import java.io.File;
+import java.util.AbstractList;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -23,11 +24,46 @@ import java.util.regex.Pattern;
 
 /**
  * On-device LLM client using LiteRT-LM for article summarization and ranking.
- * Processes articles one at a time due to the ~4096 token context window of on-device models.
+ * Packs multiple articles into a single prompt when they fit the ~4096-token context window,
+ * falling back to one-article-at-a-time processing for any items whose batch response
+ * cannot be parsed.
  * Runs synchronously — call from a background thread.
  */
 public class OnDeviceLlmClient {
     private static final String TAG = "OnDeviceLlmClient";
+
+    /**
+     * Conservative characters-per-token estimate used for context budget calculations.
+     * English text averages ~4 chars/token; using 3 to stay safely inside the window.
+     */
+    private static final int CHARS_PER_TOKEN = 3;
+
+    /** Total token context window of the on-device models. */
+    private static final int CONTEXT_TOKENS = 4096;
+
+    // --- Budget reservation constants (all values in tokens) ---
+
+    /** Tokens reserved for the system prompt in a scoring call. */
+    private static final int SCORING_SYSTEM_PROMPT_TOKENS = 80;
+    /** Maximum number of articles scored per {@link #rankAndSummarize} invocation. */
+    private static final int MAX_ARTICLES_TO_SCORE = 30;
+    /** Output tokens per scored article ("N: 0.85\n" ≈ 4–5 tokens; 8 gives headroom). */
+    private static final int OUTPUT_TOKENS_PER_SCORE = 8;
+    /** Framing/instruction overhead tokens reserved in a scoring call. */
+    private static final int SCORING_FRAMING_TOKENS = 50;
+
+    /** Tokens reserved for the system prompt in a summarising call. */
+    private static final int SUMMARISING_SYSTEM_PROMPT_TOKENS = 60;
+    /** Output tokens per summarised article (1–2 sentences ≈ 40–50 tokens; 55 gives headroom). */
+    private static final int OUTPUT_TOKENS_PER_SUMMARY = 55;
+    /** Framing/instruction overhead tokens reserved in a summarising call. */
+    private static final int SUMMARISING_FRAMING_TOKENS = 30;
+
+    /**
+     * Characters of fixed formatting per article inside a batch prompt
+     * ("[N] Title: \nDescription: \n\n" is roughly 30 chars).
+     */
+    private static final int ARTICLE_PROMPT_FORMATTING_CHARS = 30;
 
     private final Context context;
     private final String modelPath;
@@ -153,20 +189,26 @@ public class OnDeviceLlmClient {
         long startMs = System.currentTimeMillis();
         try {
             // Interleave articles across feed sources so every source gets fair representation
-            // before the 30-article scoring cap is applied.
+            // before the scoring cap is applied.
             List<ArticleData> interleaved = interleaveBySource(articles);
-            int maxArticles = Math.min(interleaved.size(), 30);
+            int maxArticles = Math.min(interleaved.size(), MAX_ARTICLES_TO_SCORE);
 
-            // Step 1: Score articles for relevance (lightweight prompt per article)
+            // Step 1: Score articles for relevance in batches (fewer LLM calls).
             List<ScoredArticle> scored = new ArrayList<>();
             if (listener != null) listener.onScoringStarted(maxArticles);
 
             long scoreStart = System.currentTimeMillis();
-            for (int i = 0; i < maxArticles; i++) {
-                ArticleData article = interleaved.get(i);
-                float score = scoreArticle(article, interestProfile);
-                scored.add(new ScoredArticle(article, score));
-                if (listener != null) listener.onArticleScored(i + 1, maxArticles);
+            int i = 0;
+            while (i < maxArticles) {
+                int batchSize = computeBatchSize(interleaved, i, maxArticles,
+                        scoringContentBudget(interestProfile));
+                List<ArticleData> batch = interleaved.subList(i, i + batchSize);
+                List<Float> scores = scoreArticlesBatch(batch, interestProfile);
+                for (int j = 0; j < scores.size(); j++) {
+                    scored.add(new ScoredArticle(batch.get(j), scores.get(j)));
+                    if (listener != null) listener.onArticleScored(i + j + 1, maxArticles);
+                }
+                i += batchSize;
             }
             Log.i(TAG, "Scoring " + maxArticles + " articles took "
                     + (System.currentTimeMillis() - scoreStart) + " ms");
@@ -174,17 +216,32 @@ public class OnDeviceLlmClient {
             // Sort by score descending
             scored.sort((a, b) -> Float.compare(b.score, a.score));
 
-            // Step 2: Summarize the top articles
+            // Step 2: Summarize the top articles in batches.
             int topCount = Math.min(count, scored.size());
             List<ArticleData> result = new ArrayList<>();
             if (listener != null) listener.onSummarizingStarted(topCount);
             long sumStart = System.currentTimeMillis();
-            for (int i = 0; i < topCount; i++) {
-                ScoredArticle sa = scored.get(i);
-                sa.article.interestScore = sa.score;
-                sa.article.llmSummary = summarizeArticle(sa.article);
-                result.add(sa.article);
-                if (listener != null) listener.onArticleSummarized(i + 1, topCount);
+            int j = 0;
+            while (j < topCount) {
+                int batchSize = computeBatchSizeFromScored(scored, j, topCount,
+                        summarizingContentBudget(topCount - j));
+                // Build a zero-copy view over the scored list instead of allocating a new list.
+                final int jOffset = j;
+                List<ArticleData> batch = new AbstractList<ArticleData>() {
+                    @Override public ArticleData get(int index) {
+                        return scored.get(jOffset + index).article;
+                    }
+                    @Override public int size() { return batchSize; }
+                };
+                List<String> summaries = summarizeArticlesBatch(batch);
+                for (int k = 0; k < batch.size(); k++) {
+                    ScoredArticle sa = scored.get(j + k);
+                    sa.article.interestScore = sa.score;
+                    sa.article.llmSummary = summaries.get(k);
+                    result.add(sa.article);
+                    if (listener != null) listener.onArticleSummarized(j + k + 1, topCount);
+                }
+                j += batchSize;
             }
             Log.i(TAG, "Summarizing " + topCount + " articles took "
                     + (System.currentTimeMillis() - sumStart) + " ms");
@@ -231,15 +288,141 @@ public class OnDeviceLlmClient {
         return result;
     }
 
+    // ---- Batch scoring ----
+
+    /**
+     * Scores a batch of articles in a single LLM call.
+     * The response is expected to be one line per article: "N: score".
+     * Any article whose score cannot be parsed falls back to {@link #scoreArticleSingle}.
+     *
+     * @return list of scores in the same order as {@code batch}
+     */
+    private List<Float> scoreArticlesBatch(List<ArticleData> batch, String interestProfile) {
+        if (batch.isEmpty()) return new ArrayList<>();
+        if (batch.size() == 1) {
+            List<Float> r = new ArrayList<>();
+            r.add(scoreArticleSingle(batch.get(0), interestProfile));
+            return r;
+        }
+
+        // No interest profile – score every article by recency without an LLM call.
+        if (interestProfile == null || interestProfile.trim().isEmpty()) {
+            List<Float> r = new ArrayList<>();
+            for (ArticleData a : batch) r.add(scoreByRecency(a));
+            return r;
+        }
+
+        try {
+            String systemPrompt = "You are a relevance scorer. "
+                    + "Given user interests and a numbered list of articles, respond with ONLY "
+                    + "a numbered list of relevance scores from 0.0 to 1.0, one per line in the "
+                    + "format \"N: score\". Nothing else.";
+
+            StringBuilder userPrompt = new StringBuilder();
+            userPrompt.append("User interests: ")
+                      .append(truncate(interestProfile, interestLimit()))
+                      .append("\n\nArticles:\n");
+            for (int i = 0; i < batch.size(); i++) {
+                ArticleData a = batch.get(i);
+                userPrompt.append("[").append(i + 1).append("] Title: ")
+                          .append(truncate(a.title, 300))
+                          .append("\nDescription: ")
+                          .append(truncate(a.originalDescription, descLimit()))
+                          .append("\n\n");
+            }
+            userPrompt.append("Relevance scores (0.0-1.0):");
+
+            int maxOutputTokens = batch.size() * OUTPUT_TOKENS_PER_SCORE;
+            SamplerConfig samplerConfig = new SamplerConfig(maxOutputTokens, 1.0, 0.0, 0);
+            ConversationConfig convConfig = new ConversationConfig(
+                    Contents.Companion.of(systemPrompt),
+                    Collections.emptyList(),
+                    Collections.emptyList(),
+                    samplerConfig,
+                    null,
+                    false
+            );
+
+            List<Float> parsed;
+            try (Conversation conversation = engine.createConversation(convConfig)) {
+                Message response = conversation.sendMessage(userPrompt.toString(),
+                        Collections.emptyMap());
+                parsed = parseBatchScores(response.toString().trim(), batch.size());
+            }
+
+            // Fill in per-article fallback for any items we could not parse.
+            List<Float> result = new ArrayList<>(batch.size());
+            for (int i = 0; i < batch.size(); i++) {
+                if (i < parsed.size() && parsed.get(i) != null) {
+                    result.add(parsed.get(i));
+                } else {
+                    Log.w(TAG, "Batch score missing for article " + (i + 1)
+                            + ", falling back to single call");
+                    result.add(scoreArticleSingle(batch.get(i), interestProfile));
+                }
+            }
+            return result;
+
+        } catch (Exception e) {
+            Log.w(TAG, "Batch scoring failed, falling back to per-article scoring", e);
+            List<Float> r = new ArrayList<>();
+            for (ArticleData a : batch) r.add(scoreArticleSingle(a, interestProfile));
+            return r;
+        }
+    }
+
+    /**
+     * Parses a batch scoring response into a list of floats.
+     * Accepts lines like "1: 0.8", "[2] 0.3", "3. 0.95", or bare numbers on separate lines.
+     * Returns a list whose size may be smaller than {@code expectedCount} if the model
+     * produced fewer lines than expected.
+     */
+    private List<Float> parseBatchScores(String response, int expectedCount) {
+        List<Float> scores = new ArrayList<>();
+        // First try: numbered lines "N: score" (with flexible delimiters).
+        Pattern numberedLine = Pattern.compile(
+                "^\\[?(\\d+)\\]?[:.)]\\s*(\\d+\\.?\\d*)");
+        String[] lines = response.split("\\r?\\n");
+        float[] byIndex = new float[expectedCount];
+        boolean[] filled = new boolean[expectedCount];
+        boolean anyNumbered = false;
+        for (String line : lines) {
+            Matcher m = numberedLine.matcher(line.trim());
+            if (m.find()) {
+                try {
+                    int idx = Integer.parseInt(m.group(1)) - 1;
+                    float score = Float.parseFloat(m.group(2));
+                    if (idx >= 0 && idx < expectedCount) {
+                        byIndex[idx] = Math.max(0f, Math.min(1f, score));
+                        filled[idx] = true;
+                        anyNumbered = true;
+                    }
+                } catch (NumberFormatException ignored) {}
+            }
+        }
+        if (anyNumbered) {
+            for (int i = 0; i < expectedCount; i++) {
+                scores.add(filled[i] ? byIndex[i] : null);
+            }
+            return scores;
+        }
+        // Fallback: sequential non-empty lines, each containing a number.
+        for (String line : lines) {
+            line = line.trim();
+            if (line.isEmpty()) continue;
+            scores.add(parseScore(line));
+            if (scores.size() == expectedCount) break;
+        }
+        return scores;
+    }
+
     /**
      * Scores a single article's relevance to the interest profile.
      * Returns a float between 0.0 and 1.0.
      */
-    private float scoreArticle(ArticleData article, String interestProfile) {
+    private float scoreArticleSingle(ArticleData article, String interestProfile) {
         if (interestProfile == null || interestProfile.trim().isEmpty()) {
-            // No interest profile — score by recency (newer = higher)
-            long ageHours = (System.currentTimeMillis() - article.pubDate) / (1000 * 60 * 60);
-            return Math.max(0f, 1f - (ageHours / 24f));
+            return scoreByRecency(article);
         }
 
         try {
@@ -272,10 +455,132 @@ public class OnDeviceLlmClient {
         }
     }
 
+    private float scoreByRecency(ArticleData article) {
+        long ageHours = (System.currentTimeMillis() - article.pubDate) / (1000 * 60 * 60);
+        return Math.max(0f, 1f - (ageHours / 24f));
+    }
+
+    // ---- Batch summarising ----
+
+    /**
+     * Summarises a batch of articles in a single LLM call.
+     * The response is expected to be lines of the form "N: summary text".
+     * Any article whose summary cannot be parsed falls back to {@link #summarizeArticleSingle}.
+     *
+     * @return list of summaries (may contain null for articles that failed) in the same order
+     */
+    private List<String> summarizeArticlesBatch(List<ArticleData> batch) {
+        if (batch.isEmpty()) return new ArrayList<>();
+        if (batch.size() == 1) {
+            List<String> r = new ArrayList<>();
+            r.add(summarizeArticleSingle(batch.get(0)));
+            return r;
+        }
+
+        try {
+            String systemPrompt = "You are a concise news summarizer. "
+                    + "For each numbered article, write a 1-2 sentence factual summary. "
+                    + "Respond with ONLY a numbered list in the format \"N: summary\". Nothing else.";
+
+            StringBuilder userPrompt = new StringBuilder("Articles:\n");
+            for (int i = 0; i < batch.size(); i++) {
+                ArticleData a = batch.get(i);
+                userPrompt.append("[").append(i + 1).append("] Title: ")
+                          .append(truncate(a.title, 300))
+                          .append("\nDescription: ")
+                          .append(truncate(a.originalDescription, descLimit()))
+                          .append("\n\n");
+            }
+            userPrompt.append("Summaries:");
+
+            int maxOutputTokens = batch.size() * OUTPUT_TOKENS_PER_SUMMARY;
+            SamplerConfig samplerConfig = new SamplerConfig(maxOutputTokens, 0.95, 0.2, 0);
+            ConversationConfig convConfig = new ConversationConfig(
+                    Contents.Companion.of(systemPrompt),
+                    Collections.emptyList(),
+                    Collections.emptyList(),
+                    samplerConfig,
+                    null,
+                    false
+            );
+
+            List<String> parsed;
+            try (Conversation conversation = engine.createConversation(convConfig)) {
+                Message response = conversation.sendMessage(userPrompt.toString(),
+                        Collections.emptyMap());
+                parsed = parseBatchSummaries(response.toString().trim(), batch.size());
+            }
+
+            // Fill in per-article fallback for any items we could not parse.
+            List<String> result = new ArrayList<>(batch.size());
+            for (int i = 0; i < batch.size(); i++) {
+                if (i < parsed.size() && parsed.get(i) != null && !parsed.get(i).isEmpty()) {
+                    result.add(parsed.get(i));
+                } else {
+                    Log.w(TAG, "Batch summary missing for article " + (i + 1)
+                            + ", falling back to single call");
+                    result.add(summarizeArticleSingle(batch.get(i)));
+                }
+            }
+            return result;
+
+        } catch (Exception e) {
+            Log.w(TAG, "Batch summarising failed, falling back to per-article summarising", e);
+            List<String> r = new ArrayList<>();
+            for (ArticleData a : batch) r.add(summarizeArticleSingle(a));
+            return r;
+        }
+    }
+
+    /**
+     * Parses a batch summarising response into a list of strings.
+     * Handles multi-line summaries: lines that do not start with "N:" are treated as
+     * continuations of the previous article's summary.
+     * Returns a list of size {@code expectedCount}; slots where the model produced no output
+     * remain null.
+     */
+    private List<String> parseBatchSummaries(String response, int expectedCount) {
+        List<String> summaries = new ArrayList<>(Collections.<String>nCopies(expectedCount, null));
+        Pattern startPattern = Pattern.compile("^\\[?(\\d+)\\]?[:.)]\\s*(.*)$");
+
+        int currentIdx = -1;
+        StringBuilder currentText = new StringBuilder();
+
+        for (String rawLine : response.split("\\r?\\n")) {
+            String line = rawLine.trim();
+            if (line.isEmpty()) continue;
+
+            Matcher m = startPattern.matcher(line);
+            if (m.matches()) {
+                // Flush the previous article's accumulated text.
+                if (currentIdx >= 0 && currentIdx < expectedCount) {
+                    String text = currentText.toString().trim();
+                    if (!text.isEmpty()) summaries.set(currentIdx, text);
+                }
+                try {
+                    currentIdx = Integer.parseInt(m.group(1)) - 1;
+                    currentText = new StringBuilder(m.group(2) != null ? m.group(2) : "");
+                } catch (NumberFormatException e) {
+                    currentIdx = -1;
+                }
+            } else if (currentIdx >= 0) {
+                // Continuation of the current article's summary.
+                if (currentText.length() > 0) currentText.append(" ");
+                currentText.append(line);
+            }
+        }
+        // Flush the last article.
+        if (currentIdx >= 0 && currentIdx < expectedCount) {
+            String text = currentText.toString().trim();
+            if (!text.isEmpty()) summaries.set(currentIdx, text);
+        }
+        return summaries;
+    }
+
     /**
      * Summarizes a single article in 1-2 sentences.
      */
-    private String summarizeArticle(ArticleData article) {
+    private String summarizeArticleSingle(ArticleData article) {
         try {
             String systemPrompt = "You are a concise news summarizer. "
                     + "Summarize the article in 1-2 sentences. Be factual and brief.";
@@ -297,7 +602,6 @@ public class OnDeviceLlmClient {
             try (Conversation conversation = engine.createConversation(convConfig)) {
                 Message response = conversation.sendMessage(userPrompt, Collections.emptyMap());
                 String summary = response.toString().trim();
-                // Clean up any leading/trailing artifacts
                 if (summary.isEmpty()) return null;
                 return summary;
             }
@@ -389,6 +693,78 @@ public class OnDeviceLlmClient {
      */
     public static String getDefaultModelPath(Context context) {
         return getModelPath(context, "gemma-1b");
+    }
+
+    // --- Batch sizing ---
+
+    /**
+     * Returns how many articles starting at {@code startIdx} fit in a single LLM call,
+     * given {@code contentBudget} chars available for article text.
+     * Always returns at least 1 so processing never stalls.
+     */
+    private int computeBatchSize(List<ArticleData> articles, int startIdx, int maxIdx,
+            int contentBudget) {
+        int remaining = contentBudget;
+        int count = 0;
+        for (int i = startIdx; i < maxIdx; i++) {
+            ArticleData a = articles.get(i);
+            int articleChars = ARTICLE_PROMPT_FORMATTING_CHARS
+                    + Math.min(a.title != null ? a.title.length() : 0, 300)
+                    + Math.min(a.originalDescription != null
+                            ? a.originalDescription.length() : 0, descLimit());
+            if (count > 0 && articleChars > remaining) break;
+            remaining -= articleChars;
+            count++;
+        }
+        return Math.max(1, count);
+    }
+
+    /**
+     * Like {@link #computeBatchSize} but works directly on a {@link ScoredArticle} list,
+     * avoiding the creation of an intermediate {@code List<ArticleData>}.
+     */
+    private int computeBatchSizeFromScored(List<ScoredArticle> scored, int startIdx, int maxIdx,
+            int contentBudget) {
+        int remaining = contentBudget;
+        int count = 0;
+        for (int i = startIdx; i < maxIdx; i++) {
+            ArticleData a = scored.get(i).article;
+            int articleChars = ARTICLE_PROMPT_FORMATTING_CHARS
+                    + Math.min(a.title != null ? a.title.length() : 0, 300)
+                    + Math.min(a.originalDescription != null
+                            ? a.originalDescription.length() : 0, descLimit());
+            if (count > 0 && articleChars > remaining) break;
+            remaining -= articleChars;
+            count++;
+        }
+        return Math.max(1, count);
+    }
+
+    /**
+     * Character budget available for article content in a scoring call.
+     * Reserves tokens for: system prompt, interest profile, output (up to
+     * {@link #MAX_ARTICLES_TO_SCORE} × {@link #OUTPUT_TOKENS_PER_SCORE}), and framing.
+     */
+    private int scoringContentBudget(String interestProfile) {
+        int interestTokens = (interestProfile != null
+                ? Math.min(interestProfile.length(), interestLimit()) : 0) / CHARS_PER_TOKEN;
+        int reserveTokens = SCORING_SYSTEM_PROMPT_TOKENS + interestTokens
+                + MAX_ARTICLES_TO_SCORE * OUTPUT_TOKENS_PER_SCORE + SCORING_FRAMING_TOKENS;
+        return Math.max(0, (CONTEXT_TOKENS - reserveTokens) * CHARS_PER_TOKEN);
+    }
+
+    /**
+     * Character budget available for article content in a summarising call.
+     * Reserves tokens for: system prompt, output ({@code remainingArticles} ×
+     * {@link #OUTPUT_TOKENS_PER_SUMMARY}), and framing.
+     *
+     * @param remainingArticles number of articles still to be summarised; used to scale the
+     *                          output reservation without over-reserving for small batches
+     */
+    private int summarizingContentBudget(int remainingArticles) {
+        int reserveTokens = SUMMARISING_SYSTEM_PROMPT_TOKENS
+                + remainingArticles * OUTPUT_TOKENS_PER_SUMMARY + SUMMARISING_FRAMING_TOKENS;
+        return Math.max(0, (CONTEXT_TOKENS - reserveTokens) * CHARS_PER_TOKEN);
     }
 
     // --- Helpers ---
