@@ -348,7 +348,7 @@ public class AppConfig {
     }
 
     public boolean isLlmBenchmarkEnabled() {
-        return prefs.getBoolean(KEY_LLM_BENCHMARK_ENABLED, false);
+        return false;
     }
 
     public void setLlmBenchmarkEnabled(boolean enabled) {
@@ -460,7 +460,7 @@ public class AppConfig {
     }
 
     public boolean isBriefingUseOpenAiTtsEnabled() {
-        return prefs.getBoolean(KEY_BRIEFING_USE_OPENAI_TTS, false);
+        return false;
     }
 
     public void setBriefingUseOpenAiTtsEnabled(boolean enabled) {
@@ -916,7 +916,7 @@ public class AppConfig {
     // --- LLM Configuration Validity ---
 
     public boolean isLlmConfigured() {
-        return !getLlmApiKey().isEmpty() && !getLlmBaseUrl().isEmpty();
+        return false;
     }
 
     public boolean isTopStoriesAvailable() {
