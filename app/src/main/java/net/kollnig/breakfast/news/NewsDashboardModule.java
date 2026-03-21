@@ -330,22 +330,16 @@ public class NewsDashboardModule {
                 List<ArticleData> topArticles;
                 boolean llmFailed = false;
 
-                allArticles.sort((a, b) -> Long.compare(b.pubDate, a.pubDate));
-                int maxArticles = Math.min(config.getArticleCount(), allArticles.size());
-                topArticles = new ArrayList<>(allArticles.subList(0, maxArticles));
-
-                if (config.isOnDeviceLlmReady()) {
-                    OnDeviceLlmClient onDevice = new OnDeviceLlmClient(
-                            activity,
-                            config.getOnDeviceModelPath(),
-                            config.isOnDeviceUseGpu());
-                    try {
-                        onDevice.initialize();
-                        topArticles = onDevice.rankAndSummarize(allArticles,
-                                config.getInterestProfile(), config.getArticleCount());
-                    } finally {
-                        onDevice.close();
-                    }
+                OnDeviceLlmClient onDevice = new OnDeviceLlmClient(
+                        activity,
+                        config.getOnDeviceModelPath(),
+                        config.isOnDeviceUseGpu());
+                try {
+                    onDevice.initialize();
+                    topArticles = onDevice.rankAndSummarize(allArticles,
+                            config.getInterestProfile(), config.getArticleCount());
+                } finally {
+                    onDevice.close();
                 }
 
                 // Check if LLM actually produced summaries or fell back

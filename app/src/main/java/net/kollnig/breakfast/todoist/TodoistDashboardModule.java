@@ -8,7 +8,6 @@ import net.kollnig.breakfast.social.*;
 import net.kollnig.breakfast.todoist.*;
 import net.kollnig.breakfast.weather.*;
 
-import android.Manifest;
 import android.content.Context;
 import android.text.TextUtils;
 import android.util.Log;
@@ -20,13 +19,11 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AlertDialog;
-import androidx.core.content.ContextCompat;
 
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
 
-import java.io.File;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -39,8 +36,6 @@ import java.util.Locale;
 import java.util.TimeZone;
 import java.util.concurrent.ExecutorService;
 
-import android.content.pm.PackageManager;
-import android.media.MediaRecorder;
 
 public class TodoistDashboardModule {
     public interface MainThreadPoster {
@@ -89,9 +84,6 @@ public class TodoistDashboardModule {
 
     private List<TodoistTask> currentTodoistTasks = new ArrayList<>();
     private boolean todoistExpanded;
-    private MediaRecorder todoistRecorder;
-    private File todoistRecordingFile;
-    private boolean todoistVoiceRecording;
 
     public TodoistDashboardModule(Context context, View rootView, AppConfig config,
                                   ExecutorService executor, MainThreadPoster mainThreadPoster,
@@ -205,51 +197,23 @@ public class TodoistDashboardModule {
     }
 
     public void toggleVoiceCapture() {
-        if (!config.isTodoistConfigured()) {
-            Toast.makeText(context, "Add your Todoist API details in Settings first.", Toast.LENGTH_SHORT).show();
-            settingsOpener.openSettings();
-            return;
-        }
-
-        if (!config.isOnDeviceLlmReady()) {
-            Toast.makeText(context, "Voice todos need an on-device model. Download one in Settings first.", Toast.LENGTH_SHORT).show();
-            settingsOpener.openSettings();
-            return;
-        }
-
-        if (todoistVoiceRecording) {
-            stopVoiceRecording(true);
-            return;
-        }
-
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO)
-                == PackageManager.PERMISSION_GRANTED) {
-            startVoiceRecording();
-        } else {
-            audioPermissionRequester.requestAudioPermission();
-        }
+        Toast.makeText(context, "Voice todos are unavailable in on-device-only mode.", Toast.LENGTH_LONG).show();
     }
 
     public void onAudioPermissionResult(boolean granted) {
-        if (granted) {
-            startVoiceRecording();
-        } else {
-            Toast.makeText(context, "Microphone access is required for voice todos.", Toast.LENGTH_SHORT).show();
-        }
+        // Voice todos are unavailable in on-device-only mode.
     }
 
     public void stopVoiceCaptureOnPause() {
-        if (todoistVoiceRecording) {
-            stopVoiceRecording(false);
-        }
+        // Voice todos are unavailable in on-device-only mode.
     }
 
     public void release() {
-        releaseTodoistRecorder();
+        // Voice todos are unavailable in on-device-only mode.
     }
 
     public boolean isVoiceRecording() {
-        return todoistVoiceRecording;
+        return false;
     }
 
     private List<TodoistTask> sortTodoistTasks(List<TodoistTask> tasks) {
@@ -628,94 +592,6 @@ public class TodoistDashboardModule {
                 });
             }
         });
-    }
-
-    private void startVoiceRecording() {
-        try {
-            todoistRecordingFile = File.createTempFile("todoist-voice-", ".m4a", context.getCacheDir());
-            releaseTodoistRecorder();
-            todoistRecorder = new MediaRecorder();
-            todoistRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
-            todoistRecorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
-            todoistRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
-            todoistRecorder.setAudioSamplingRate(44100);
-            todoistRecorder.setAudioEncodingBitRate(96000);
-            todoistRecorder.setOutputFile(todoistRecordingFile.getAbsolutePath());
-            todoistRecorder.prepare();
-            todoistRecorder.start();
-            todoistVoiceRecording = true;
-            optionsMenuInvalidator.invalidateOptionsMenu();
-            Toast.makeText(context, "Recording voice todo...", Toast.LENGTH_SHORT).show();
-        } catch (Exception e) {
-            Log.e(TAG, "Unable to start voice recording", e);
-            releaseTodoistRecorder();
-            if (todoistRecordingFile != null) {
-                //noinspection ResultOfMethodCallIgnored
-                todoistRecordingFile.delete();
-            }
-            todoistRecordingFile = null;
-            todoistVoiceRecording = false;
-            optionsMenuInvalidator.invalidateOptionsMenu();
-            Toast.makeText(context, "Could not start microphone recording.", Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    private void stopVoiceRecording(boolean processCommand) {
-        try {
-            if (todoistRecorder != null) {
-                todoistRecorder.stop();
-            }
-        } catch (RuntimeException e) {
-            Log.e(TAG, "Unable to stop voice recording cleanly", e);
-        } finally {
-            releaseTodoistRecorder();
-            todoistVoiceRecording = false;
-            optionsMenuInvalidator.invalidateOptionsMenu();
-        }
-
-        if (!processCommand || todoistRecordingFile == null || !todoistRecordingFile.exists()) {
-            if (todoistRecordingFile != null) {
-                //noinspection ResultOfMethodCallIgnored
-                todoistRecordingFile.delete();
-            }
-            todoistRecordingFile = null;
-            return;
-        }
-
-        processVoiceTodoCommand(todoistRecordingFile);
-    }
-
-    private void processVoiceTodoCommand(File audioFile) {
-        todoistLoading.setVisibility(View.VISIBLE);
-        executor.execute(() -> {
-            try {
-                audioFile.delete();
-                todoistRecordingFile = null;
-                mainThreadPoster.post(() -> {
-                    todoistLoading.setVisibility(View.GONE);
-                    Toast.makeText(context, "Voice todos are currently unavailable.", Toast.LENGTH_LONG).show();
-                });
-            } catch (Exception e) {
-                Log.e(TAG, "Error processing voice todo command", e);
-                if (audioFile.exists()) {
-                    //noinspection ResultOfMethodCallIgnored
-                    audioFile.delete();
-                }
-                todoistRecordingFile = null;
-                mainThreadPoster.post(() -> {
-                    todoistLoading.setVisibility(View.GONE);
-                    Toast.makeText(context, "Voice todo failed.", Toast.LENGTH_SHORT).show();
-                });
-            }
-        });
-    }
-
-    private void releaseTodoistRecorder() {
-        if (todoistRecorder != null) {
-            todoistRecorder.reset();
-            todoistRecorder.release();
-            todoistRecorder = null;
-        }
     }
 
 }
