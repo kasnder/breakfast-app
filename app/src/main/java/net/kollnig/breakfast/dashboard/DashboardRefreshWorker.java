@@ -94,15 +94,6 @@ public class DashboardRefreshWorker extends Worker {
                             } finally {
                                 onDevice.close();
                             }
-                        } else {
-                            LlmClient llm = new LlmClient(
-                                    config.getLlmBaseUrl(),
-                                    config.getLlmApiKey(),
-                                    config.getLlmModel());
-                            topArticles = llm.rankAndSummarize(
-                                    allArticles,
-                                    config.getInterestProfile(),
-                                    config.getArticleCount());
                         }
                     } catch (Exception ignored) {
                         // Keep fallback top articles from the feed sort if AI is unavailable.

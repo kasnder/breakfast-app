@@ -93,7 +93,6 @@ public class NewsDashboardModule {
 
     // Speaker instances
     private MorningBriefingSpeaker morningBriefingSpeaker;
-    private OpenAiBriefingSpeaker openAiBriefingSpeaker;
 
     public NewsDashboardModule(Activity activity, View cardNews, View cardHeadlines,
                               AppConfig config, ExecutorService executor,
@@ -162,34 +161,6 @@ public class NewsDashboardModule {
             }
         });
 
-        openAiBriefingSpeaker = new OpenAiBriefingSpeaker(activity, new OpenAiBriefingSpeaker.Listener() {
-            @Override
-            public void onPlaybackStateChanged(boolean isPlaying) {
-                mainThreadPoster.post(() -> updateBriefingPlaybackUi(isPlaying));
-            }
-
-            @Override
-            public void onUnavailable(String message) {
-                mainThreadPoster.post(() -> {
-                    briefingScriptGenerationInProgress = false;
-                    updateBriefingPlaybackUi(false);
-                    briefingAudioProgress.setVisibility(View.GONE);
-                    briefingAudioStatus.setText(message);
-                    briefingAudioStatus.setVisibility(View.VISIBLE);
-                    Toast.makeText(activity, message, Toast.LENGTH_SHORT).show();
-                    if (config.isBriefingUseOpenAiTtsEnabled()) {
-                        boolean fallbackStarted = morningBriefingSpeaker.toggle(buildBriefingTranscript());
-                        if (fallbackStarted) {
-                            syncBriefingPlaybackStatus();
-                        } else {
-                            briefingAudioProgress.setVisibility(View.GONE);
-                            briefingAudioStatus.setText(R.string.briefing_audio_unavailable);
-                            briefingAudioStatus.setVisibility(View.VISIBLE);
-                        }
-                    }
-                });
-            }
-        });
     }
 
     public void loadCachedArticles() {
@@ -356,13 +327,12 @@ public class NewsDashboardModule {
                     return;
                 }
 
-                // Run benchmark comparison if enabled (before the main path)
-                if (config.isLlmBenchmarkEnabled()) {
-                    LlmBenchmark.compare(activity, config, allArticles);
-                }
-
                 List<ArticleData> topArticles;
                 boolean llmFailed = false;
+
+                allArticles.sort((a, b) -> Long.compare(b.pubDate, a.pubDate));
+                int maxArticles = Math.min(config.getArticleCount(), allArticles.size());
+                topArticles = new ArrayList<>(allArticles.subList(0, maxArticles));
 
                 if (config.isOnDeviceLlmReady()) {
                     OnDeviceLlmClient onDevice = new OnDeviceLlmClient(
@@ -376,13 +346,6 @@ public class NewsDashboardModule {
                     } finally {
                         onDevice.close();
                     }
-                } else {
-                    LlmClient llm = new LlmClient(
-                            config.getLlmBaseUrl(),
-                            config.getLlmApiKey(),
-                            config.getLlmModel());
-                    topArticles = llm.rankAndSummarize(allArticles, config.getInterestProfile(),
-                            config.getArticleCount());
                 }
 
                 // Check if LLM actually produced summaries or fell back
@@ -605,20 +568,17 @@ public class NewsDashboardModule {
             return;
         }
 
-        if (briefingScriptGenerationInProgress || isAnyBriefingPlaying() || openAiBriefingSpeaker.isLoading()) {
+        if (briefingScriptGenerationInProgress || isAnyBriefingPlaying()) {
             briefingScriptGenerationInProgress = false;
             briefingScriptGenerationRequestId++;
             if (morningBriefingSpeaker.isPlaying()) {
                 morningBriefingSpeaker.stop();
             }
-            if (openAiBriefingSpeaker.isPlaying() || openAiBriefingSpeaker.isLoading()) {
-                openAiBriefingSpeaker.stop();
-            }
             syncBriefingPlaybackStatus();
             return;
         }
 
-        boolean shouldGenerateScriptWithLlm = config.isLlmConfigured();
+        boolean shouldGenerateScriptWithLlm = config.isOnDeviceLlmReady();
         if (shouldGenerateScriptWithLlm) {
             briefingScriptGenerationInProgress = true;
             int requestId = ++briefingScriptGenerationRequestId;
@@ -677,13 +637,6 @@ public class NewsDashboardModule {
             invalidateMenuCallback.invalidateMenu();
             return;
         }
-        if (openAiBriefingSpeaker.isLoading()) {
-            briefingAudioStatus.setText(R.string.briefing_audio_loading);
-            briefingAudioStatus.setVisibility(View.VISIBLE);
-            briefingAudioProgress.setVisibility(View.VISIBLE);
-            invalidateMenuCallback.invalidateMenu();
-            return;
-        }
         updateBriefingPlaybackUi(isAnyBriefingPlaying());
     }
 
@@ -708,13 +661,6 @@ public class NewsDashboardModule {
             } finally {
                 onDevice.close();
             }
-        } else if (config.isLlmConfigured()) {
-            LlmClient llmClient = new LlmClient(
-                    config.getLlmBaseUrl(),
-                    config.getLlmApiKey(),
-                    config.getLlmModel()
-            );
-            generated = llmClient.generateMorningBriefingScript(structuredData);
         }
 
         if (generated == null || generated.trim().isEmpty()) {
@@ -814,18 +760,7 @@ public class NewsDashboardModule {
     }
 
     private void startBriefingPlayback(String transcript) {
-        boolean started;
-        if (config.isBriefingUseOpenAiTtsEnabled()) {
-            if (morningBriefingSpeaker.isPlaying()) {
-                morningBriefingSpeaker.stop();
-            }
-            started = openAiBriefingSpeaker.toggle(transcript, config);
-        } else {
-            if (openAiBriefingSpeaker.isPlaying() || openAiBriefingSpeaker.isLoading()) {
-                openAiBriefingSpeaker.stop();
-            }
-            started = morningBriefingSpeaker.toggle(transcript);
-        }
+        boolean started = morningBriefingSpeaker.toggle(transcript);
         if (started) {
             syncBriefingPlaybackStatus();
         } else {
@@ -874,19 +809,16 @@ public class NewsDashboardModule {
     }
 
     public boolean isAnyBriefingPlaying() {
-        return morningBriefingSpeaker.isPlaying() || openAiBriefingSpeaker.isPlaying();
+        return morningBriefingSpeaker.isPlaying();
     }
 
     public boolean isBriefingBusy() {
-        return briefingScriptGenerationInProgress || openAiBriefingSpeaker.isLoading();
+        return briefingScriptGenerationInProgress;
     }
 
     public void shutdown() {
         if (morningBriefingSpeaker != null) {
             morningBriefingSpeaker.shutdown();
-        }
-        if (openAiBriefingSpeaker != null) {
-            openAiBriefingSpeaker.shutdown();
         }
     }
 }

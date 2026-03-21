@@ -4,7 +4,7 @@ Breakfast is an Android app for a calmer morning dashboard. It brings together a
 
 - Weather for your chosen city
 - A latest-feed list from RSS or Atom sources you select
-- An optional AI briefing that ranks and summarizes only the feeds you mark for it
+- An optional on-device AI briefing that ranks and summarizes only the feeds you mark for it
 - Social-app access controls for Instagram and LinkedIn
 - Optional personal notes and a calendar overview
 
@@ -34,7 +34,7 @@ When the app opens:
 2. It fetches fresh weather for the configured city.
 3. It fetches recent articles from your RSS or Atom feeds.
 4. It fills the latest-feed card from the feeds selected for that list.
-5. If AI is configured, it ranks and summarizes articles from the feeds selected for the AI briefing.
+5. If an on-device model is ready, it ranks and summarizes articles from the feeds selected for the AI briefing.
 6. It shows the enabled cards on the main screen as a morning snapshot.
 7. It can schedule a morning refresh and notify you when the dashboard is ready.
 
@@ -44,7 +44,7 @@ The social feature works as a timed access window. While the timer is active, th
 
 Breakfast currently uses these Android permissions:
 
-- `INTERNET` for weather, feeds, and optional AI requests
+- `INTERNET` for weather and feed requests
 - `READ_CALENDAR` for the optional calendar overview
 - `POST_NOTIFICATIONS` for timer and dashboard notifications
 - `FOREGROUND_SERVICE` for the social timer notification
@@ -60,7 +60,7 @@ Network requests are only made for the features you enable:
 
 - Weather requests go to Open-Meteo
 - Feed requests go to the RSS or Atom sources you add
-- AI requests go to the configured OpenAI-compatible endpoint if you supply one
+- AI ranking and summarization run on-device when a local model is downloaded and enabled
 
 This repository does not include analytics or ad SDKs.
 

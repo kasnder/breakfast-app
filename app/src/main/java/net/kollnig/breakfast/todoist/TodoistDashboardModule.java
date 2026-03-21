@@ -205,8 +205,14 @@ public class TodoistDashboardModule {
     }
 
     public void toggleVoiceCapture() {
-        if (!config.isTodoistConfigured() || !config.isLlmConfigured()) {
-            Toast.makeText(context, "Add your OpenAI API details in Settings first.", Toast.LENGTH_SHORT).show();
+        if (!config.isTodoistConfigured()) {
+            Toast.makeText(context, "Add your Todoist API details in Settings first.", Toast.LENGTH_SHORT).show();
+            settingsOpener.openSettings();
+            return;
+        }
+
+        if (!config.isOnDeviceLlmReady()) {
+            Toast.makeText(context, "Voice todos need an on-device model. Download one in Settings first.", Toast.LENGTH_SHORT).show();
             settingsOpener.openSettings();
             return;
         }
@@ -683,54 +689,11 @@ public class TodoistDashboardModule {
         todoistLoading.setVisibility(View.VISIBLE);
         executor.execute(() -> {
             try {
-                OpenAiTodoVoiceClient voiceClient = new OpenAiTodoVoiceClient(
-                        config.getLlmBaseUrl(),
-                        config.getLlmApiKey(),
-                        config.getLlmModel()
-                );
-                OpenAiTodoVoiceClient.VoiceTodoCommand command =
-                        voiceClient.transcribeAndInterpret(audioFile, currentTodoistTasks);
-                //noinspection ResultOfMethodCallIgnored
                 audioFile.delete();
                 todoistRecordingFile = null;
-
-                if ("add".equalsIgnoreCase(command.action) && !TextUtils.isEmpty(command.title)) {
-                    TodoistClient todoistClient = new TodoistClient(config.getTodoistApiKey());
-                    todoistClient.addTask(config.getTodoistProjectId(), command.title);
-                    mainThreadPoster.post(() -> {
-                        Toast.makeText(context, "Added: " + command.title, Toast.LENGTH_SHORT).show();
-                        refreshData();
-                    });
-                    return;
-                }
-
-                if ("complete".equalsIgnoreCase(command.action) && !TextUtils.isEmpty(command.taskId)) {
-                    TodoistClient todoistClient = new TodoistClient(config.getTodoistApiKey());
-                    todoistClient.closeTask(command.taskId);
-                    String completedTitle = findTodoTitleById(command.taskId);
-                    mainThreadPoster.post(() -> {
-                        Toast.makeText(
-                                context,
-                                TextUtils.isEmpty(completedTitle)
-                                        ? "Marked todo done"
-                                        : "Completed: " + completedTitle,
-                                Toast.LENGTH_SHORT
-                        ).show();
-                        refreshData();
-                    });
-                    return;
-                }
-
                 mainThreadPoster.post(() -> {
                     todoistLoading.setVisibility(View.GONE);
-                    String transcript = command.transcript == null ? "" : command.transcript.trim();
-                    Toast.makeText(
-                            context,
-                            transcript.isEmpty()
-                                    ? "I couldn’t figure out that todo command."
-                                    : "Heard: " + transcript,
-                            Toast.LENGTH_LONG
-                    ).show();
+                    Toast.makeText(context, "Voice todos are currently unavailable.", Toast.LENGTH_LONG).show();
                 });
             } catch (Exception e) {
                 Log.e(TAG, "Error processing voice todo command", e);
@@ -741,7 +704,7 @@ public class TodoistDashboardModule {
                 todoistRecordingFile = null;
                 mainThreadPoster.post(() -> {
                     todoistLoading.setVisibility(View.GONE);
-                    Toast.makeText(context, "Voice todo failed. Check your OpenAI setup.", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(context, "Voice todo failed.", Toast.LENGTH_SHORT).show();
                 });
             }
         });
@@ -755,15 +718,4 @@ public class TodoistDashboardModule {
         }
     }
 
-    private String findTodoTitleById(String taskId) {
-        if (TextUtils.isEmpty(taskId)) {
-            return "";
-        }
-        for (TodoistTask task : currentTodoistTasks) {
-            if (taskId.equals(task.id)) {
-                return task.content == null ? "" : task.content;
-            }
-        }
-        return "";
-    }
 }

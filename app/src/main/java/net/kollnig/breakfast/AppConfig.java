@@ -32,11 +32,7 @@ public class AppConfig {
     private static final String PREFS_NAME = "BreakfastPrefs";
     private static final String KEY_CITY = "weather_city";
     private static final String KEY_RSS_FEEDS = "rss_feeds";
-    private static final String KEY_LLM_BASE_URL = "llm_base_url";
-    private static final String KEY_LLM_API_KEY = "llm_api_key";
-    private static final String KEY_LLM_MODEL = "llm_model";
     private static final String KEY_INTEREST_PROFILE = "interest_profile";
-    private static final String KEY_BRIEFING_USE_OPENAI_TTS = "briefing_use_openai_tts";
     private static final String KEY_TODOIST_API_KEY = "todoist_api_key";
     private static final String KEY_TODOIST_PROJECT_ID = "todoist_project_id";
     private static final String KEY_TODOIST_ENABLED = "module_todoist_enabled";
@@ -78,7 +74,6 @@ public class AppConfig {
     private static final String KEY_ON_DEVICE_MODEL_PATH = "on_device_model_path";
     private static final String KEY_ON_DEVICE_USE_GPU = "on_device_use_gpu";
     private static final String KEY_ON_DEVICE_MODEL_VARIANT = "on_device_model_variant";
-    private static final String KEY_LLM_BENCHMARK_ENABLED = "llm_benchmark_enabled";
     private static final String KEY_HUGGINGFACE_TOKEN = "huggingface_token";
     private static final String KEY_NEWS_CACHE_SCHEMA_VERSION = "news_cache_schema_version";
     private static final int NEWS_CACHE_SCHEMA_VERSION = 2;
@@ -279,32 +274,6 @@ public class AppConfig {
         return new ArrayList<>(urls);
     }
 
-    // --- LLM Config ---
-
-    public String getLlmBaseUrl() {
-        return prefs.getString(KEY_LLM_BASE_URL, "https://api.openai.com/v1");
-    }
-
-    public void setLlmBaseUrl(String url) {
-        prefs.edit().putString(KEY_LLM_BASE_URL, url).apply();
-    }
-
-    public String getLlmApiKey() {
-        return prefs.getString(KEY_LLM_API_KEY, "");
-    }
-
-    public void setLlmApiKey(String key) {
-        prefs.edit().putString(KEY_LLM_API_KEY, key).apply();
-    }
-
-    public String getLlmModel() {
-        return prefs.getString(KEY_LLM_MODEL, "gpt-4o-mini");
-    }
-
-    public void setLlmModel(String model) {
-        prefs.edit().putString(KEY_LLM_MODEL, model).apply();
-    }
-
     // --- On-Device LLM Config ---
 
     public boolean isOnDeviceLlmEnabled() {
@@ -345,14 +314,6 @@ public class AppConfig {
 
     public void setHuggingFaceToken(String token) {
         prefs.edit().putString(KEY_HUGGINGFACE_TOKEN, token).apply();
-    }
-
-    public boolean isLlmBenchmarkEnabled() {
-        return prefs.getBoolean(KEY_LLM_BENCHMARK_ENABLED, false);
-    }
-
-    public void setLlmBenchmarkEnabled(boolean enabled) {
-        prefs.edit().putBoolean(KEY_LLM_BENCHMARK_ENABLED, enabled).apply();
     }
 
     // --- Interest Profile ---
@@ -457,14 +418,6 @@ public class AppConfig {
                 .remove(KEY_CACHED_TODOIST_TASKS)
                 .remove(KEY_TODOIST_LAST_REFRESH)
                 .apply();
-    }
-
-    public boolean isBriefingUseOpenAiTtsEnabled() {
-        return prefs.getBoolean(KEY_BRIEFING_USE_OPENAI_TTS, false);
-    }
-
-    public void setBriefingUseOpenAiTtsEnabled(boolean enabled) {
-        prefs.edit().putBoolean(KEY_BRIEFING_USE_OPENAI_TTS, enabled).apply();
     }
 
     // --- Cached Weather ---
@@ -915,12 +868,8 @@ public class AppConfig {
 
     // --- LLM Configuration Validity ---
 
-    public boolean isLlmConfigured() {
-        return !getLlmApiKey().isEmpty() && !getLlmBaseUrl().isEmpty();
-    }
-
     public boolean isTopStoriesAvailable() {
-        return isLlmConfigured() || isOnDeviceLlmReady();
+        return isOnDeviceLlmReady();
     }
 
     public boolean isOnDeviceLlmReady() {
