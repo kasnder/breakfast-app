@@ -734,7 +734,7 @@ public class TodoistDashboardModule {
                     OnDeviceTodoVoiceClient onDeviceClient = new OnDeviceTodoVoiceClient(
                             context,
                             config.getOnDeviceModelPath(),
-                            config.isOnDeviceUseGpu()
+                            config.getOnDeviceAccelerator()
                     );
                     command = onDeviceClient.interpretAudio(audioFile, currentTodoistTasks);
                 } else {

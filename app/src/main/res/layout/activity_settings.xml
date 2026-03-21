@@ -490,12 +490,39 @@
 
             </RadioGroup>
 
-            <com.google.android.material.materialswitch.MaterialSwitch
-                android:id="@+id/switch_on_device_gpu"
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Hardware Accelerator"
+                android:textAppearance="?attr/textAppearanceBodySmall"
+                android:textColor="@color/text_light"
+                android:layout_marginBottom="4dp" />
+
+            <RadioGroup
+                android:id="@+id/radio_accelerator"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Use GPU acceleration"
-                android:layout_marginBottom="16dp" />
+                android:layout_marginBottom="16dp">
+
+                <com.google.android.material.radiobutton.MaterialRadioButton
+                    android:id="@+id/radio_accelerator_npu"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="NPU — Google Tensor NPU (Pixel 8+, fastest)" />
+
+                <com.google.android.material.radiobutton.MaterialRadioButton
+                    android:id="@+id/radio_accelerator_gpu"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="GPU — OpenCL GPU acceleration" />
+
+                <com.google.android.material.radiobutton.MaterialRadioButton
+                    android:id="@+id/radio_accelerator_cpu"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="CPU — no hardware acceleration" />
+
+            </RadioGroup>
 
             <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="match_parent"

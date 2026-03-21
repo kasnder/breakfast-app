@@ -368,7 +368,7 @@ public class NewsDashboardModule {
                     OnDeviceLlmClient onDevice = new OnDeviceLlmClient(
                             activity,
                             config.getOnDeviceModelPath(),
-                            config.isOnDeviceUseGpu());
+                            config.getOnDeviceAccelerator());
                     try {
                         onDevice.initialize();
                         topArticles = onDevice.rankAndSummarize(allArticles,
@@ -699,7 +699,7 @@ public class NewsDashboardModule {
             OnDeviceLlmClient onDevice = new OnDeviceLlmClient(
                     activity,
                     config.getOnDeviceModelPath(),
-                    config.isOnDeviceUseGpu());
+                    config.getOnDeviceAccelerator());
             try {
                 onDevice.initialize();
                 generated = onDevice.generateMorningBriefingScript(structuredData);

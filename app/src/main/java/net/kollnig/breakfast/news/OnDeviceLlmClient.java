@@ -12,6 +12,8 @@ import com.google.ai.edge.litertlm.EngineConfig;
 import com.google.ai.edge.litertlm.Message;
 import com.google.ai.edge.litertlm.SamplerConfig;
 
+import net.kollnig.breakfast.AppConfig;
+
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -29,15 +31,15 @@ public class OnDeviceLlmClient {
 
     private final Context context;
     private final String modelPath;
-    private final boolean useGpu;
+    private final String acceleratorType;
     private final boolean isE2B;
 
     private Engine engine;
 
-    public OnDeviceLlmClient(Context context, String modelPath, boolean useGpu) {
+    public OnDeviceLlmClient(Context context, String modelPath, String acceleratorType) {
         this.context = context.getApplicationContext();
         this.modelPath = modelPath;
-        this.useGpu = useGpu;
+        this.acceleratorType = acceleratorType;
         this.isE2B = modelPath != null && modelPath.toLowerCase().contains("e2b");
     }
 
@@ -57,9 +59,17 @@ public class OnDeviceLlmClient {
     public synchronized void initialize() throws Exception {
         if (engine != null) return;
 
+        Backend backend;
+        if (AppConfig.ACCELERATOR_NPU.equals(acceleratorType)) {
+            backend = new Backend.GoogleTensorNpu();
+        } else if (AppConfig.ACCELERATOR_GPU.equals(acceleratorType)) {
+            backend = new Backend.GPU();
+        } else {
+            backend = new Backend.CPU();
+        }
         EngineConfig config = new EngineConfig(
                 modelPath,
-                useGpu ? new Backend.GPU() : new Backend.CPU(),
+                backend,
                 null, // visionBackend
                 null, // audioBackend
                 null, // maxNumTokens

@@ -95,7 +95,7 @@ public class SettingsActivity extends AppCompatActivity {
     private List<String> moduleOrder = new ArrayList<>();
     private final Map<String, MaterialSwitch> moduleSwitches = new HashMap<>();
     private MaterialSwitch switchOnDeviceLlm;
-    private MaterialSwitch switchOnDeviceGpu;
+    private android.widget.RadioGroup radioAccelerator;
     private MaterialSwitch switchLlmBenchmark;
     private MaterialButton btnDownloadModel;
     private TextView textOnDeviceLlmStatus;
@@ -172,7 +172,7 @@ public class SettingsActivity extends AppCompatActivity {
         refreshButtonModeText = findViewById(R.id.text_news_refresh_mode);
         briefingOpenAiTtsText = findViewById(R.id.text_briefing_openai_tts);
         switchOnDeviceLlm = findViewById(R.id.switch_on_device_llm);
-        switchOnDeviceGpu = findViewById(R.id.switch_on_device_gpu);
+        radioAccelerator = findViewById(R.id.radio_accelerator);
         switchLlmBenchmark = findViewById(R.id.switch_llm_benchmark);
         btnDownloadModel = findViewById(R.id.btn_download_model);
         textOnDeviceLlmStatus = findViewById(R.id.text_on_device_llm_status);
@@ -263,8 +263,19 @@ public class SettingsActivity extends AppCompatActivity {
             updateOnDeviceModelStatus();
             refreshFeedsList();
         });
-        switchOnDeviceGpu.setOnCheckedChangeListener((buttonView, isChecked) ->
-                config.setOnDeviceUseGpu(isChecked));
+        radioAccelerator.setOnCheckedChangeListener((group, checkedId) -> {
+            String accelerator;
+            if (checkedId == R.id.radio_accelerator_npu) {
+                accelerator = AppConfig.ACCELERATOR_NPU;
+            } else if (checkedId == R.id.radio_accelerator_cpu) {
+                accelerator = AppConfig.ACCELERATOR_CPU;
+            } else if (checkedId == R.id.radio_accelerator_gpu) {
+                accelerator = AppConfig.ACCELERATOR_GPU;
+            } else {
+                return; // unknown selection; do not persist
+            }
+            config.setOnDeviceAccelerator(accelerator);
+        });
         switchLlmBenchmark.setOnCheckedChangeListener((buttonView, isChecked) ->
                 config.setLlmBenchmarkEnabled(isChecked));
         inputHuggingfaceToken.addTextChangedListener(new android.text.TextWatcher() {
@@ -308,7 +319,14 @@ public class SettingsActivity extends AppCompatActivity {
         switchEnableRefreshButton.setChecked(config.isRefreshButtonEnabled());
         switchBriefingOpenAiTts.setChecked(config.isBriefingUseOpenAiTtsEnabled());
         switchOnDeviceLlm.setChecked(config.isOnDeviceLlmEnabled());
-        switchOnDeviceGpu.setChecked(config.isOnDeviceUseGpu());
+        String accelerator = config.getOnDeviceAccelerator();
+        if (AppConfig.ACCELERATOR_NPU.equals(accelerator)) {
+            radioAccelerator.check(R.id.radio_accelerator_npu);
+        } else if (AppConfig.ACCELERATOR_CPU.equals(accelerator)) {
+            radioAccelerator.check(R.id.radio_accelerator_cpu);
+        } else {
+            radioAccelerator.check(R.id.radio_accelerator_gpu);
+        }
         switchLlmBenchmark.setChecked(config.isLlmBenchmarkEnabled());
         inputHuggingfaceToken.setText(config.getHuggingFaceToken());
         String variant = config.getOnDeviceModelVariant();

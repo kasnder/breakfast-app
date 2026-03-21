@@ -69,7 +69,7 @@ public class LlmBenchmark {
             List<ArticleData> deviceInput = deepCopy(articles);
             long start = System.currentTimeMillis();
             OnDeviceLlmClient onDevice = new OnDeviceLlmClient(
-                    context, modelPath, config.isOnDeviceUseGpu());
+                    context, modelPath, config.getOnDeviceAccelerator());
             try {
                 long initStart = System.currentTimeMillis();
                 onDevice.initialize();

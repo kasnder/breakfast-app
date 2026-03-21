@@ -4,6 +4,7 @@ import android.content.Context;
 import android.util.Log;
 
 import com.google.ai.edge.litertlm.Backend;
+import net.kollnig.breakfast.AppConfig;
 import com.google.ai.edge.litertlm.Content;
 import com.google.ai.edge.litertlm.Conversation;
 import com.google.ai.edge.litertlm.ConversationConfig;
@@ -30,12 +31,12 @@ public class OnDeviceTodoVoiceClient {
 
     private final Context context;
     private final String modelPath;
-    private final boolean useGpu;
+    private final String acceleratorType;
 
-    public OnDeviceTodoVoiceClient(Context context, String modelPath, boolean useGpu) {
+    public OnDeviceTodoVoiceClient(Context context, String modelPath, String acceleratorType) {
         this.context = context.getApplicationContext();
         this.modelPath = modelPath;
-        this.useGpu = useGpu;
+        this.acceleratorType = acceleratorType;
     }
 
     public OpenAiTodoVoiceClient.VoiceTodoCommand interpretAudio(
@@ -46,7 +47,7 @@ public class OnDeviceTodoVoiceClient {
         try {
             EngineConfig config = new EngineConfig(
                     modelPath,
-                    useGpu ? new Backend.GPU() : new Backend.CPU(),
+                    buildTextBackend(),
                     null,
                     new Backend.CPU(), // Audio processing uses CPU; GPU audio backend is not yet supported
                     null,
@@ -140,7 +141,7 @@ public class OnDeviceTodoVoiceClient {
         try {
             EngineConfig config = new EngineConfig(
                     modelPath,
-                    useGpu ? new Backend.GPU() : new Backend.CPU(),
+                    buildTextBackend(),
                     null,
                     null,
                     null,
@@ -236,5 +237,15 @@ public class OnDeviceTodoVoiceClient {
             }
         }
         return content.trim();
+    }
+
+    private Backend buildTextBackend() {
+        if (AppConfig.ACCELERATOR_NPU.equals(acceleratorType)) {
+            return new Backend.GoogleTensorNpu();
+        } else if (AppConfig.ACCELERATOR_GPU.equals(acceleratorType)) {
+            return new Backend.GPU();
+        } else {
+            return new Backend.CPU();
+        }
     }
 }
