@@ -467,6 +467,29 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Use GPU acceleration"
+                android:layout_marginBottom="16dp" />
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="HuggingFace API Token (optional)"
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                android:layout_marginBottom="8dp">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/input_huggingface_token"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="text"
+                    android:imeOptions="actionDone" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Required to download the Gemma model from HuggingFace. Get your token at huggingface.co/settings/tokens after accepting the Gemma license."
+                android:textAppearance="?attr/textAppearanceBodySmall"
+                android:textColor="@color/text_light"
                 android:layout_marginBottom="8dp" />
 
             <com.google.android.material.button.MaterialButton

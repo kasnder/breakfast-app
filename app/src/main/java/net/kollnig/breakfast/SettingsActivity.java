@@ -99,6 +99,7 @@ public class SettingsActivity extends AppCompatActivity {
     private MaterialSwitch switchLlmBenchmark;
     private MaterialButton btnDownloadModel;
     private TextView textOnDeviceLlmStatus;
+    private com.google.android.material.textfield.TextInputEditText inputHuggingfaceToken;
     private boolean socialSettingsUnlocked;
     private boolean updatingSocialModuleSwitch;
 
@@ -174,6 +175,7 @@ public class SettingsActivity extends AppCompatActivity {
         switchLlmBenchmark = findViewById(R.id.switch_llm_benchmark);
         btnDownloadModel = findViewById(R.id.btn_download_model);
         textOnDeviceLlmStatus = findViewById(R.id.text_on_device_llm_status);
+        inputHuggingfaceToken = findViewById(R.id.input_huggingface_token);
 
         // Add feed button
         findViewById(R.id.btn_add_feed).setOnClickListener(v -> showAddFeedDialog());
@@ -263,6 +265,16 @@ public class SettingsActivity extends AppCompatActivity {
                 config.setOnDeviceUseGpu(isChecked));
         switchLlmBenchmark.setOnCheckedChangeListener((buttonView, isChecked) ->
                 config.setLlmBenchmarkEnabled(isChecked));
+        inputHuggingfaceToken.addTextChangedListener(new android.text.TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override
+            public void afterTextChanged(android.text.Editable s) {
+                config.setHuggingFaceToken(s.toString());
+            }
+        });
         btnDownloadModel.setOnClickListener(v -> startModelDownload());
     }
 
@@ -287,6 +299,7 @@ public class SettingsActivity extends AppCompatActivity {
         switchOnDeviceLlm.setChecked(config.isOnDeviceLlmEnabled());
         switchOnDeviceGpu.setChecked(config.isOnDeviceUseGpu());
         switchLlmBenchmark.setChecked(config.isLlmBenchmarkEnabled());
+        inputHuggingfaceToken.setText(config.getHuggingFaceToken());
         updateOnDeviceModelStatus();
         moduleOrder = new ArrayList<>(config.getModuleOrder());
         updateMorningRefreshTimeText();
@@ -642,7 +655,12 @@ public class SettingsActivity extends AppCompatActivity {
                         .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
                         .readTimeout(5, java.util.concurrent.TimeUnit.MINUTES)
                         .build();
-                okhttp3.Request request = new okhttp3.Request.Builder().url(url).build();
+                okhttp3.Request.Builder requestBuilder = new okhttp3.Request.Builder().url(url);
+                String token = config.getHuggingFaceToken();
+                if (token != null && !token.isEmpty()) {
+                    requestBuilder.header("Authorization", "Bearer " + token);
+                }
+                okhttp3.Request request = requestBuilder.build();
                 okhttp3.Response response = downloadClient.newCall(request).execute();
 
                 if (!response.isSuccessful() || response.body() == null) {
