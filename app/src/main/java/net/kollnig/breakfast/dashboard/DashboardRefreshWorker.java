@@ -84,7 +84,7 @@ public class DashboardRefreshWorker extends Worker {
                             OnDeviceLlmClient onDevice = new OnDeviceLlmClient(
                                     context,
                                     config.getOnDeviceModelPath(),
-                                    config.isOnDeviceUseGpu());
+                                    config.getOnDeviceAccelerator());
                             try {
                                 onDevice.initialize();
                                 topArticles = onDevice.rankAndSummarize(

@@ -76,7 +76,8 @@ public class AppConfig {
     private static final String KEY_DASHBOARD_LAST_REFRESH = "dashboard_last_refresh";
     private static final String KEY_ON_DEVICE_LLM_ENABLED = "on_device_llm_enabled";
     private static final String KEY_ON_DEVICE_MODEL_PATH = "on_device_model_path";
-    private static final String KEY_ON_DEVICE_USE_GPU = "on_device_use_gpu";
+    private static final String KEY_ON_DEVICE_USE_GPU = "on_device_use_gpu"; // legacy boolean
+    private static final String KEY_ON_DEVICE_ACCELERATOR = "on_device_accelerator";
     private static final String KEY_ON_DEVICE_MODEL_VARIANT = "on_device_model_variant";
     private static final String KEY_LLM_BENCHMARK_ENABLED = "llm_benchmark_enabled";
     private static final String KEY_HUGGINGFACE_TOKEN = "huggingface_token";
@@ -94,6 +95,12 @@ public class AppConfig {
     public static final String MODEL_VARIANT_GEMMA_1B = "gemma-1b";
     public static final String MODEL_VARIANT_GEMMA_E2B = "gemma-e2b";
     public static final String MODEL_VARIANT_DEFAULT = MODEL_VARIANT_GEMMA_1B;
+
+    // On-device LLM accelerator types
+    public static final String ACCELERATOR_CPU = "cpu";
+    public static final String ACCELERATOR_GPU = "gpu";
+    public static final String ACCELERATOR_NPU = "npu";
+    public static final String ACCELERATOR_DEFAULT = ACCELERATOR_GPU;
 
     private final SharedPreferences prefs;
     private final Gson gson;
@@ -323,12 +330,17 @@ public class AppConfig {
         prefs.edit().putString(KEY_ON_DEVICE_MODEL_PATH, path).apply();
     }
 
-    public boolean isOnDeviceUseGpu() {
-        return prefs.getBoolean(KEY_ON_DEVICE_USE_GPU, true);
+    public String getOnDeviceAccelerator() {
+        // Migrate from legacy boolean preference
+        if (!prefs.contains(KEY_ON_DEVICE_ACCELERATOR) && prefs.contains(KEY_ON_DEVICE_USE_GPU)) {
+            boolean legacyGpu = prefs.getBoolean(KEY_ON_DEVICE_USE_GPU, true);
+            return legacyGpu ? ACCELERATOR_GPU : ACCELERATOR_CPU;
+        }
+        return prefs.getString(KEY_ON_DEVICE_ACCELERATOR, ACCELERATOR_DEFAULT);
     }
 
-    public void setOnDeviceUseGpu(boolean useGpu) {
-        prefs.edit().putBoolean(KEY_ON_DEVICE_USE_GPU, useGpu).apply();
+    public void setOnDeviceAccelerator(String accelerator) {
+        prefs.edit().putString(KEY_ON_DEVICE_ACCELERATOR, accelerator).apply();
     }
 
     public String getOnDeviceModelVariant() {
