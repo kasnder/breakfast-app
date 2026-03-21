@@ -10,6 +10,7 @@ import net.kollnig.breakfast.weather.*;
 
 import android.Manifest;
 import android.content.Context;
+import android.content.Intent;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -41,6 +42,8 @@ import java.util.concurrent.ExecutorService;
 
 import android.content.pm.PackageManager;
 import android.media.MediaRecorder;
+import android.speech.RecognizerIntent;
+import android.speech.SpeechRecognizer;
 
 public class TodoistDashboardModule {
     public interface MainThreadPoster {
@@ -67,6 +70,10 @@ public class TodoistDashboardModule {
         void requestAudioPermission();
     }
 
+    public interface SpeechRecognitionLauncher {
+        void launch(Intent intent);
+    }
+
     private static final String TAG = "TodoistModule";
 
     private final Context context;
@@ -80,6 +87,7 @@ public class TodoistDashboardModule {
     private final OptionsMenuInvalidator optionsMenuInvalidator;
     private final ActionFailureNotifier actionFailureNotifier;
     private final AudioPermissionRequester audioPermissionRequester;
+    private final SpeechRecognitionLauncher speechRecognitionLauncher;
     private final TextView todoistStatus;
     private final TextView todoistHint;
     private final ProgressBar todoistLoading;
@@ -98,7 +106,8 @@ public class TodoistDashboardModule {
                                   RelativeTimeFormatter relativeTimeFormatter,
                                   SettingsOpener settingsOpener, ArticleOpener articleOpener,
                                   OptionsMenuInvalidator optionsMenuInvalidator,
-                                  AudioPermissionRequester audioPermissionRequester) {
+                                  AudioPermissionRequester audioPermissionRequester,
+                                  SpeechRecognitionLauncher speechRecognitionLauncher) {
         this.context = context;
         this.rootView = rootView;
         this.config = config;
@@ -110,6 +119,7 @@ public class TodoistDashboardModule {
         this.optionsMenuInvalidator = optionsMenuInvalidator;
         this.actionFailureNotifier = new ActionFailureNotifier(context);
         this.audioPermissionRequester = audioPermissionRequester;
+        this.speechRecognitionLauncher = speechRecognitionLauncher;
         this.todoistStatus = rootView.findViewById(R.id.todoist_status);
         this.todoistHint = rootView.findViewById(R.id.todoist_hint);
         this.todoistLoading = rootView.findViewById(R.id.todoist_loading);
@@ -205,9 +215,14 @@ public class TodoistDashboardModule {
     }
 
     public void toggleVoiceCapture() {
-        if (!config.isTodoistConfigured() || !config.isLlmConfigured()) {
-            Toast.makeText(context, "Add your OpenAI API details in Settings first.", Toast.LENGTH_SHORT).show();
+        if (!config.isTodoistConfigured() || (!config.isLlmConfigured() && !config.isOnDeviceLlmReady())) {
+            Toast.makeText(context, "Please configure Todoist and either cloud LLM (OpenAI) or on-device LLM in Settings.", Toast.LENGTH_SHORT).show();
             settingsOpener.openSettings();
+            return;
+        }
+
+        if (config.isOnDeviceLlmReady()) {
+            launchSpeechRecognition();
             return;
         }
 
@@ -222,6 +237,50 @@ public class TodoistDashboardModule {
         } else {
             audioPermissionRequester.requestAudioPermission();
         }
+    }
+
+    private void launchSpeechRecognition() {
+        if (!SpeechRecognizer.isRecognitionAvailable(context)) {
+            Toast.makeText(context, "Speech recognition is not available on this device.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+        intent.putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true);
+        intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false);
+        intent.putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak your todo command");
+        speechRecognitionLauncher.launch(intent);
+    }
+
+    public void onSpeechRecognitionResult(String transcript) {
+        String cleaned = transcript == null ? "" : transcript.trim();
+        if (cleaned.isEmpty()) {
+            Toast.makeText(context, "I couldn’t hear a todo command.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        processOnDeviceTranscript(cleaned);
+    }
+
+    private void processOnDeviceTranscript(String transcript) {
+        todoistLoading.setVisibility(View.VISIBLE);
+        executor.execute(() -> {
+            try {
+                OnDeviceTodoVoiceClient onDeviceClient = new OnDeviceTodoVoiceClient(
+                        context,
+                        config.getOnDeviceModelPath(),
+                        config.isOnDeviceUseGpu()
+                );
+                OpenAiTodoVoiceClient.VoiceTodoCommand command =
+                        onDeviceClient.interpretTranscript(transcript, currentTodoistTasks);
+                applyVoiceCommand(command);
+            } catch (Exception e) {
+                Log.e(TAG, "Error processing on-device voice todo command", e);
+                mainThreadPoster.post(() -> {
+                    todoistLoading.setVisibility(View.GONE);
+                    Toast.makeText(context, "Voice todo failed with on-device model.", Toast.LENGTH_SHORT).show();
+                });
+            }
+        });
     }
 
     public void onAudioPermissionResult(boolean granted) {
@@ -694,44 +753,7 @@ public class TodoistDashboardModule {
                 audioFile.delete();
                 todoistRecordingFile = null;
 
-                if ("add".equalsIgnoreCase(command.action) && !TextUtils.isEmpty(command.title)) {
-                    TodoistClient todoistClient = new TodoistClient(config.getTodoistApiKey());
-                    todoistClient.addTask(config.getTodoistProjectId(), command.title);
-                    mainThreadPoster.post(() -> {
-                        Toast.makeText(context, "Added: " + command.title, Toast.LENGTH_SHORT).show();
-                        refreshData();
-                    });
-                    return;
-                }
-
-                if ("complete".equalsIgnoreCase(command.action) && !TextUtils.isEmpty(command.taskId)) {
-                    TodoistClient todoistClient = new TodoistClient(config.getTodoistApiKey());
-                    todoistClient.closeTask(command.taskId);
-                    String completedTitle = findTodoTitleById(command.taskId);
-                    mainThreadPoster.post(() -> {
-                        Toast.makeText(
-                                context,
-                                TextUtils.isEmpty(completedTitle)
-                                        ? "Marked todo done"
-                                        : "Completed: " + completedTitle,
-                                Toast.LENGTH_SHORT
-                        ).show();
-                        refreshData();
-                    });
-                    return;
-                }
-
-                mainThreadPoster.post(() -> {
-                    todoistLoading.setVisibility(View.GONE);
-                    String transcript = command.transcript == null ? "" : command.transcript.trim();
-                    Toast.makeText(
-                            context,
-                            transcript.isEmpty()
-                                    ? "I couldn’t figure out that todo command."
-                                    : "Heard: " + transcript,
-                            Toast.LENGTH_LONG
-                    ).show();
-                });
+                applyVoiceCommand(command);
             } catch (Exception e) {
                 Log.e(TAG, "Error processing voice todo command", e);
                 if (audioFile.exists()) {
@@ -741,9 +763,50 @@ public class TodoistDashboardModule {
                 todoistRecordingFile = null;
                 mainThreadPoster.post(() -> {
                     todoistLoading.setVisibility(View.GONE);
-                    Toast.makeText(context, "Voice todo failed. Check your OpenAI setup.", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(context, "Voice todo failed. Check your LLM voice setup.", Toast.LENGTH_SHORT).show();
                 });
             }
+        });
+    }
+
+    private void applyVoiceCommand(OpenAiTodoVoiceClient.VoiceTodoCommand command) throws Exception {
+        TodoistClient todoistClient = new TodoistClient(config.getTodoistApiKey());
+
+        if ("add".equalsIgnoreCase(command.action) && !TextUtils.isEmpty(command.title)) {
+            todoistClient.addTask(config.getTodoistProjectId(), command.title);
+            mainThreadPoster.post(() -> {
+                Toast.makeText(context, "Added: " + command.title, Toast.LENGTH_SHORT).show();
+                refreshData();
+            });
+            return;
+        }
+
+        if ("complete".equalsIgnoreCase(command.action) && !TextUtils.isEmpty(command.taskId)) {
+            todoistClient.closeTask(command.taskId);
+            String completedTitle = findTodoTitleById(command.taskId);
+            mainThreadPoster.post(() -> {
+                Toast.makeText(
+                        context,
+                        TextUtils.isEmpty(completedTitle)
+                                ? "Marked todo done"
+                                : "Completed: " + completedTitle,
+                        Toast.LENGTH_SHORT
+                ).show();
+                refreshData();
+            });
+            return;
+        }
+
+        mainThreadPoster.post(() -> {
+            todoistLoading.setVisibility(View.GONE);
+            String transcript = command.transcript == null ? "" : command.transcript.trim();
+            Toast.makeText(
+                    context,
+                    transcript.isEmpty()
+                            ? "I couldn’t figure out that todo command."
+                            : "Heard: " + transcript,
+                    Toast.LENGTH_LONG
+            ).show();
         });
     }
 

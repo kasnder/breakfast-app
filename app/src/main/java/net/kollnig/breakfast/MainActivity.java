@@ -15,6 +15,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.CalendarContract;
+import android.speech.RecognizerIntent;
 import android.text.TextUtils;
 import android.text.SpannableStringBuilder;
 import android.util.Log;
@@ -80,6 +81,20 @@ public class MainActivity extends AppCompatActivity {
             registerForActivityResult(new ActivityResultContracts.RequestPermission(),
                     granted -> {
                     });
+    private final ActivityResultLauncher<Intent> speechRecognitionLauncher =
+            registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
+                if (todoistModule == null) {
+                    return;
+                }
+                if (result.getResultCode() != RESULT_OK || result.getData() == null) {
+                    todoistModule.onSpeechRecognitionResult("");
+                    return;
+                }
+                ArrayList<String> matches = result.getData()
+                        .getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
+                String transcript = (matches == null || matches.isEmpty()) ? "" : matches.get(0);
+                todoistModule.onSpeechRecognitionResult(transcript);
+            });
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -178,7 +193,8 @@ public class MainActivity extends AppCompatActivity {
                 () -> startActivity(new Intent(this, SettingsActivity.class)),
                 newsModule::openArticleInCustomTab,
                 this::invalidateOptionsMenu,
-                () -> audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO));
+                () -> audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO),
+                intent -> speechRecognitionLauncher.launch(intent));
 
         findViewById(R.id.btn_dismiss_welcome).setOnClickListener(v -> {
             config.setWelcomeDismissed(true);
