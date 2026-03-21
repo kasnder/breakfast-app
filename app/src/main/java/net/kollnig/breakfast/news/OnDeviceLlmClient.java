@@ -30,6 +30,7 @@ public class OnDeviceLlmClient {
     private final Context context;
     private final String modelPath;
     private final boolean useGpu;
+    private final boolean isE2B;
 
     private Engine engine;
 
@@ -37,7 +38,17 @@ public class OnDeviceLlmClient {
         this.context = context.getApplicationContext();
         this.modelPath = modelPath;
         this.useGpu = useGpu;
+        this.isE2B = modelPath != null && modelPath.toLowerCase().contains("e2b");
     }
+
+    /** Max chars for article description prompts (scoring / summarisation). */
+    private int descLimit() { return isE2B ? 3000 : 500; }
+
+    /** Max chars for the interest-profile snippet in prompts. */
+    private int interestLimit() { return isE2B ? 2000 : 200; }
+
+    /** Max chars for the morning-briefing input. */
+    private int briefingInputLimit() { return isE2B ? 12000 : 1500; }
 
     /**
      * Initializes the LiteRT-LM engine. This can take several seconds.
@@ -147,9 +158,9 @@ public class OnDeviceLlmClient {
             String systemPrompt = "You are a relevance scorer. Given an article and user interests, "
                     + "respond with ONLY a number from 0.0 to 1.0 indicating relevance. Nothing else.";
 
-            String userPrompt = "User interests: " + truncate(interestProfile, 200)
-                    + "\n\nArticle title: " + truncate(article.title, 150)
-                    + "\nArticle description: " + truncate(article.originalDescription, 300)
+            String userPrompt = "User interests: " + truncate(interestProfile, interestLimit())
+                    + "\n\nArticle title: " + truncate(article.title, 300)
+                    + "\nArticle description: " + truncate(article.originalDescription, descLimit())
                     + "\n\nRelevance score (0.0-1.0):";
 
             SamplerConfig samplerConfig = new SamplerConfig(1, 0.95, 0.1, 0);
@@ -181,8 +192,8 @@ public class OnDeviceLlmClient {
             String systemPrompt = "You are a concise news summarizer. "
                     + "Summarize the article in 1-2 sentences. Be factual and brief.";
 
-            String userPrompt = "Title: " + truncate(article.title, 200)
-                    + "\nDescription: " + truncate(article.originalDescription, 500)
+            String userPrompt = "Title: " + truncate(article.title, 300)
+                    + "\nDescription: " + truncate(article.originalDescription, descLimit())
                     + "\n\nSummary:";
 
             SamplerConfig samplerConfig = new SamplerConfig(10, 0.95, 0.3, 0);
@@ -210,7 +221,6 @@ public class OnDeviceLlmClient {
 
     /**
      * Generates a morning briefing script from structured dashboard data.
-     * Kept shorter than the cloud version due to context limits.
      */
     public String generateMorningBriefingScript(String structuredDashboardData) {
         if (structuredDashboardData == null || structuredDashboardData.trim().isEmpty()) {
@@ -223,7 +233,7 @@ public class OnDeviceLlmClient {
 
         try {
             // Trim input to fit context — keep only the most important sections
-            String trimmedData = trimDashboardData(structuredDashboardData, 1500);
+            String trimmedData = trimDashboardData(structuredDashboardData, briefingInputLimit());
 
             String systemPrompt = "You are writing a brief spoken morning briefing. "
                     + "Be concise, calm, and informative. Cover weather, then headlines, then personal items. "
