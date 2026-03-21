@@ -61,6 +61,7 @@ Network requests are only made for the features you enable:
 - Weather requests go to Open-Meteo
 - Feed requests go to the RSS or Atom sources you add
 - AI requests go to the configured OpenAI-compatible endpoint if you supply one
+  - Voice todo transcription uses Android's built-in speech recognizer when on-device LLM is enabled
 
 This repository does not include analytics or ad SDKs.
 

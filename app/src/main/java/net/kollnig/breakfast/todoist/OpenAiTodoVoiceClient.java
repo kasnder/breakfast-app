@@ -28,6 +28,10 @@ import okhttp3.Response;
 public class OpenAiTodoVoiceClient {
     private static final MediaType AUDIO_M4A = MediaType.get("audio/mp4");
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
+    private static final String FALLBACK_TRANSCRIPTION_MODEL = "gpt-4o-mini-transcribe";
+    private static final int INTERPRET_RETRY_COUNT = 3;
+    private static final double INITIAL_INTERPRET_TEMPERATURE = 0.1;
+    private static final double RETRY_INTERPRET_TEMPERATURE = 0.0;
 
     private final OkHttpClient client;
     private final String baseUrl;
@@ -50,86 +54,123 @@ public class OpenAiTodoVoiceClient {
     }
 
     private String transcribeAudio(File audioFile) throws Exception {
-        MultipartBody requestBody = new MultipartBody.Builder()
-                .setType(MultipartBody.FORM)
-                .addFormDataPart("model", "gpt-4o-mini-transcribe")
-                .addFormDataPart(
-                        "file",
-                        audioFile.getName(),
-                        RequestBody.create(audioFile, AUDIO_M4A)
-                )
-                .build();
-
-        Request request = new Request.Builder()
-                .url(baseUrl + "/audio/transcriptions")
-                .addHeader("Authorization", "Bearer " + apiKey)
-                .post(requestBody)
-                .build();
-
-        try (Response response = client.newCall(request).execute()) {
-            if (!response.isSuccessful() || response.body() == null) {
-                throw new IOException("Transcription failed with HTTP " + response.code());
-            }
-            JSONObject json = new JSONObject(response.body().string());
-            return json.optString("text", "").trim();
+        String[] modelsToTry;
+        if (TextUtils.isEmpty(model) || FALLBACK_TRANSCRIPTION_MODEL.equals(model)) {
+            modelsToTry = new String[]{FALLBACK_TRANSCRIPTION_MODEL};
+        } else {
+            modelsToTry = new String[]{model, FALLBACK_TRANSCRIPTION_MODEL};
         }
+
+        IOException lastError = null;
+        for (String transcriptionModel : modelsToTry) {
+            MultipartBody requestBody = new MultipartBody.Builder()
+                    .setType(MultipartBody.FORM)
+                    .addFormDataPart("model", transcriptionModel)
+                    .addFormDataPart(
+                            "file",
+                            audioFile.getName(),
+                            RequestBody.create(audioFile, AUDIO_M4A)
+                    )
+                    .build();
+
+            Request request = new Request.Builder()
+                    .url(baseUrl + "/audio/transcriptions")
+                    .addHeader("Authorization", "Bearer " + apiKey)
+                    .post(requestBody)
+                    .build();
+
+            try (Response response = client.newCall(request).execute()) {
+                if (!response.isSuccessful() || response.body() == null) {
+                    lastError = new IOException("Transcription failed with HTTP " + response.code()
+                            + " using model " + transcriptionModel);
+                    continue;
+                }
+                JSONObject json = new JSONObject(response.body().string());
+                String text = json.optString("text", "").trim();
+                if (!text.isEmpty()) {
+                    return text;
+                }
+                lastError = new IOException("Transcription returned empty text using model "
+                        + transcriptionModel);
+            }
+        }
+
+        throw lastError != null ? lastError : new IOException("Transcription failed");
     }
 
     private VoiceTodoCommand interpretTranscript(String transcript, List<TodoistTask> tasks) throws Exception {
-        JSONObject requestBody = new JSONObject();
-        requestBody.put("model", model);
-        requestBody.put("temperature", 0.1);
-        requestBody.put("response_format", new JSONObject().put("type", "json_object"));
+        String previousInvalidJson = null;
+        for (int attempt = 1; attempt <= INTERPRET_RETRY_COUNT; attempt++) {
+            JSONObject requestBody = new JSONObject();
+            requestBody.put("model", model);
+            requestBody.put("temperature",
+                    attempt == 1 ? INITIAL_INTERPRET_TEMPERATURE : RETRY_INTERPRET_TEMPERATURE);
+            requestBody.put("response_format", new JSONObject().put("type", "json_object"));
 
-        JSONArray messages = new JSONArray();
-        messages.put(new JSONObject()
-                .put("role", "system")
-                .put("content",
-                        "You convert spoken todo commands into JSON. " +
-                        "Return only JSON with keys: action, title, task_id, transcript. " +
-                        "action must be one of add, complete, none. " +
-                        "Use task_id only when matching an existing todo to complete. " +
-                        "For add, put the spoken todo text into title in a cleaned-up form. " +
-                        "If the intent is unclear, return action none."));
+            JSONArray messages = new JSONArray();
+            messages.put(new JSONObject()
+                    .put("role", "system")
+                    .put("content",
+                            "You convert spoken todo commands into JSON. " +
+                            "Return only JSON with keys: action, title, task_id, transcript. " +
+                            "action must be one of add, complete, none. " +
+                            "Use task_id only when matching an existing todo to complete. " +
+                            "For add, put the spoken todo text into title in a cleaned-up form. " +
+                            "If the intent is unclear, return action none."));
 
-        StringBuilder userPrompt = new StringBuilder();
-        userPrompt.append("Transcript: ").append(transcript).append("\n\n");
-        userPrompt.append("Open tasks:\n");
-        for (TodoistTask task : tasks) {
-            userPrompt.append("- id=").append(task.id)
-                    .append(", title=").append(task.content)
-                    .append("\n");
-        }
-        messages.put(new JSONObject()
-                .put("role", "user")
-                .put("content", userPrompt.toString()));
-
-        requestBody.put("messages", messages);
-
-        Request request = new Request.Builder()
-                .url(baseUrl + "/chat/completions")
-                .addHeader("Authorization", "Bearer " + apiKey)
-                .addHeader("Content-Type", "application/json")
-                .post(RequestBody.create(requestBody.toString(), JSON))
-                .build();
-
-        try (Response response = client.newCall(request).execute()) {
-            if (!response.isSuccessful() || response.body() == null) {
-                throw new IOException("Voice command interpretation failed with HTTP " + response.code());
+            StringBuilder userPrompt = new StringBuilder();
+            userPrompt.append("Transcript: ").append(transcript).append("\n\n");
+            userPrompt.append("Open tasks:\n");
+            for (TodoistTask task : tasks) {
+                userPrompt.append("- id=").append(task.id)
+                        .append(", title=").append(task.content)
+                        .append("\n");
             }
-            JSONObject json = new JSONObject(response.body().string());
-            String content = json.getJSONArray("choices")
-                    .getJSONObject(0)
-                    .getJSONObject("message")
-                    .getString("content");
-            JSONObject commandJson = new JSONObject(stripMarkdownCodeFences(content));
-            VoiceTodoCommand command = new VoiceTodoCommand();
-            command.action = commandJson.optString("action", "none");
-            command.title = commandJson.optString("title", "");
-            command.taskId = commandJson.optString("task_id", "");
-            command.transcript = commandJson.optString("transcript", transcript);
-            return command;
+            if (previousInvalidJson != null) {
+                userPrompt.append("\nPrevious output was invalid JSON. ");
+                userPrompt.append("Retry and return valid JSON only. Invalid output:\n");
+                userPrompt.append(previousInvalidJson);
+            }
+            messages.put(new JSONObject()
+                    .put("role", "user")
+                    .put("content", userPrompt.toString()));
+
+            requestBody.put("messages", messages);
+
+            Request request = new Request.Builder()
+                    .url(baseUrl + "/chat/completions")
+                    .addHeader("Authorization", "Bearer " + apiKey)
+                    .addHeader("Content-Type", "application/json")
+                    .post(RequestBody.create(requestBody.toString(), JSON))
+                    .build();
+
+            try (Response response = client.newCall(request).execute()) {
+                if (!response.isSuccessful() || response.body() == null) {
+                    throw new IOException("Voice command interpretation failed with HTTP " + response.code());
+                }
+                JSONObject json = new JSONObject(response.body().string());
+                String content = json.getJSONArray("choices")
+                        .getJSONObject(0)
+                        .getJSONObject("message")
+                        .getString("content");
+                String cleanedJson = stripMarkdownCodeFences(content);
+                try {
+                    JSONObject commandJson = new JSONObject(cleanedJson);
+                    VoiceTodoCommand command = new VoiceTodoCommand();
+                    command.action = commandJson.optString("action", "none");
+                    command.title = commandJson.optString("title", "");
+                    command.taskId = commandJson.optString("task_id", "");
+                    command.transcript = commandJson.optString("transcript", transcript);
+                    return command;
+                } catch (Exception parseError) {
+                    previousInvalidJson = cleanedJson;
+                    if (attempt == INTERPRET_RETRY_COUNT) {
+                        throw parseError;
+                    }
+                }
+            }
         }
+        throw new IOException("Voice command interpretation failed");
     }
 
     private String stripMarkdownCodeFences(String text) {
