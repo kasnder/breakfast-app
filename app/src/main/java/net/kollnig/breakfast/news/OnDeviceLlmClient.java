@@ -15,7 +15,9 @@ import com.google.ai.edge.litertlm.SamplerConfig;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -89,14 +91,59 @@ public class OnDeviceLlmClient {
     }
 
     /**
+     * Callback interface for tracking on-device LLM processing progress.
+     * All callbacks are invoked from the background thread that runs the LLM.
+     */
+    public interface ProgressListener {
+        /**
+         * Called at the start of the weighting (scoring) phase.
+         * @param total number of articles to be scored
+         */
+        void onScoringStarted(int total);
+
+        /**
+         * Called after each article has been scored.
+         * @param scored number of articles scored so far
+         * @param total  total number of articles to score
+         */
+        void onArticleScored(int scored, int total);
+
+        /**
+         * Called at the start of the summarising phase.
+         * @param total number of articles to be summarised
+         */
+        void onSummarizingStarted(int total);
+
+        /**
+         * Called after each article has been summarised.
+         * @param summarized number of articles summarised so far
+         * @param total      total number of articles to summarise
+         */
+        void onArticleSummarized(int summarized, int total);
+    }
+
+    /**
      * Ranks articles by relevance to the user's interest profile, then summarizes the top ones.
      *
      * Strategy (fits within ~4096 token context per call):
      * 1. Score each article's relevance using a short prompt per article
      * 2. Sort by score, take the top {@code count}
      * 3. Summarize each of the top articles individually
+     *
+     * Articles are interleaved across feed sources before the 30-article cap so that every
+     * configured source has a fair chance of being represented in the ranked output.
      */
-    public List<ArticleData> rankAndSummarize(List<ArticleData> articles, String interestProfile, int count) {
+    public List<ArticleData> rankAndSummarize(List<ArticleData> articles, String interestProfile,
+            int count) {
+        return rankAndSummarize(articles, interestProfile, count, null);
+    }
+
+    /**
+     * Like {@link #rankAndSummarize(List, String, int)} but reports progress via
+     * {@code listener} (may be null).
+     */
+    public List<ArticleData> rankAndSummarize(List<ArticleData> articles, String interestProfile,
+            int count, ProgressListener listener) {
         if (articles.isEmpty()) return new ArrayList<>();
         if (engine == null) {
             Log.e(TAG, "Engine not initialized");
@@ -105,15 +152,21 @@ public class OnDeviceLlmClient {
 
         long startMs = System.currentTimeMillis();
         try {
+            // Interleave articles across feed sources so every source gets fair representation
+            // before the 30-article scoring cap is applied.
+            List<ArticleData> interleaved = interleaveBySource(articles);
+            int maxArticles = Math.min(interleaved.size(), 30);
+
             // Step 1: Score articles for relevance (lightweight prompt per article)
             List<ScoredArticle> scored = new ArrayList<>();
-            int maxArticles = Math.min(articles.size(), 30);
+            if (listener != null) listener.onScoringStarted(maxArticles);
 
             long scoreStart = System.currentTimeMillis();
             for (int i = 0; i < maxArticles; i++) {
-                ArticleData article = articles.get(i);
+                ArticleData article = interleaved.get(i);
                 float score = scoreArticle(article, interestProfile);
                 scored.add(new ScoredArticle(article, score));
+                if (listener != null) listener.onArticleScored(i + 1, maxArticles);
             }
             Log.i(TAG, "Scoring " + maxArticles + " articles took "
                     + (System.currentTimeMillis() - scoreStart) + " ms");
@@ -124,12 +177,14 @@ public class OnDeviceLlmClient {
             // Step 2: Summarize the top articles
             int topCount = Math.min(count, scored.size());
             List<ArticleData> result = new ArrayList<>();
+            if (listener != null) listener.onSummarizingStarted(topCount);
             long sumStart = System.currentTimeMillis();
             for (int i = 0; i < topCount; i++) {
                 ScoredArticle sa = scored.get(i);
                 sa.article.interestScore = sa.score;
                 sa.article.llmSummary = summarizeArticle(sa.article);
                 result.add(sa.article);
+                if (listener != null) listener.onArticleSummarized(i + 1, topCount);
             }
             Log.i(TAG, "Summarizing " + topCount + " articles took "
                     + (System.currentTimeMillis() - sumStart) + " ms");
@@ -141,6 +196,39 @@ public class OnDeviceLlmClient {
             Log.e(TAG, "Error in on-device ranking", e);
             return fallbackTopArticles(articles, count);
         }
+    }
+
+    /**
+     * Interleaves articles from different feed sources in a round-robin fashion so that no
+     * single source dominates the articles that make it past the scoring-count cap.
+     * The relative order within each source is preserved (newest-first as they come from
+     * the fetcher).
+     */
+    private List<ArticleData> interleaveBySource(List<ArticleData> articles) {
+        // Group by source feed URL, preserving insertion order.
+        Map<String, List<ArticleData>> bySource = new LinkedHashMap<>();
+        for (ArticleData article : articles) {
+            String key = article.sourceFeedUrl != null ? article.sourceFeedUrl : "";
+            bySource.computeIfAbsent(key, k -> new ArrayList<>()).add(article);
+        }
+        if (bySource.size() <= 1) {
+            // Only one source (or no source info) – no interleaving needed.
+            return articles;
+        }
+        List<List<ArticleData>> buckets = new ArrayList<>(bySource.values());
+        List<ArticleData> result = new ArrayList<>(articles.size());
+        int maxBucketSize = 0;
+        for (List<ArticleData> bucket : buckets) {
+            if (bucket.size() > maxBucketSize) maxBucketSize = bucket.size();
+        }
+        for (int i = 0; i < maxBucketSize; i++) {
+            for (List<ArticleData> bucket : buckets) {
+                if (i < bucket.size()) {
+                    result.add(bucket.get(i));
+                }
+            }
+        }
+        return result;
     }
 
     /**

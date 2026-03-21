@@ -81,6 +81,7 @@ public class DashboardRefreshWorker extends Worker {
                 if (config.isTopStoriesAvailable()) {
                     try {
                         if (config.isOnDeviceLlmReady()) {
+                            final DashboardNotifier notifier = new DashboardNotifier(context);
                             OnDeviceLlmClient onDevice = new OnDeviceLlmClient(
                                     context,
                                     config.getOnDeviceModelPath(),
@@ -90,8 +91,46 @@ public class DashboardRefreshWorker extends Worker {
                                 topArticles = onDevice.rankAndSummarize(
                                         allArticles,
                                         config.getInterestProfile(),
-                                        config.getArticleCount());
+                                        config.getArticleCount(),
+                                        new OnDeviceLlmClient.ProgressListener() {
+                                            @Override
+                                            public void onScoringStarted(int total) {
+                                                notifier.showProcessingNotification(
+                                                        context.getString(
+                                                                R.string.llm_processing_weighting,
+                                                                0, total),
+                                                        0, total);
+                                            }
+
+                                            @Override
+                                            public void onArticleScored(int scored, int total) {
+                                                notifier.showProcessingNotification(
+                                                        context.getString(
+                                                                R.string.llm_processing_weighting,
+                                                                scored, total),
+                                                        scored, total);
+                                            }
+
+                                            @Override
+                                            public void onSummarizingStarted(int total) {
+                                                notifier.showProcessingNotification(
+                                                        context.getString(
+                                                                R.string.llm_processing_summarising,
+                                                                0, total),
+                                                        0, total);
+                                            }
+
+                                            @Override
+                                            public void onArticleSummarized(int summarized, int total) {
+                                                notifier.showProcessingNotification(
+                                                        context.getString(
+                                                                R.string.llm_processing_summarising,
+                                                                summarized, total),
+                                                        summarized, total);
+                                            }
+                                        });
                             } finally {
+                                notifier.cancelProcessingNotification();
                                 onDevice.close();
                             }
                         } else {

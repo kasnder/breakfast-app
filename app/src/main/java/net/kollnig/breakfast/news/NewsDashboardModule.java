@@ -372,7 +372,41 @@ public class NewsDashboardModule {
                     try {
                         onDevice.initialize();
                         topArticles = onDevice.rankAndSummarize(allArticles,
-                                config.getInterestProfile(), config.getArticleCount());
+                                config.getInterestProfile(), config.getArticleCount(),
+                                new OnDeviceLlmClient.ProgressListener() {
+                                    @Override
+                                    public void onScoringStarted(int total) {
+                                        mainThreadPoster.post(() -> {
+                                            newsStatus.setText(activity.getString(
+                                                    R.string.llm_processing_weighting, 0, total));
+                                            newsStatus.setVisibility(View.VISIBLE);
+                                        });
+                                    }
+
+                                    @Override
+                                    public void onArticleScored(int scored, int total) {
+                                        mainThreadPoster.post(() -> newsStatus.setText(
+                                                activity.getString(
+                                                        R.string.llm_processing_weighting,
+                                                        scored, total)));
+                                    }
+
+                                    @Override
+                                    public void onSummarizingStarted(int total) {
+                                        mainThreadPoster.post(() -> newsStatus.setText(
+                                                activity.getString(
+                                                        R.string.llm_processing_summarising,
+                                                        0, total)));
+                                    }
+
+                                    @Override
+                                    public void onArticleSummarized(int summarized, int total) {
+                                        mainThreadPoster.post(() -> newsStatus.setText(
+                                                activity.getString(
+                                                        R.string.llm_processing_summarising,
+                                                        summarized, total)));
+                                    }
+                                });
                     } finally {
                         onDevice.close();
                     }

@@ -54,4 +54,7 @@
     <string name="on_device_model_ready">Model ready (%s)</string>
     <string name="on_device_model_downloading">Downloading model… %d%%</string>
     <string name="on_device_model_download_failed">Download failed: %s</string>
+    <string name="llm_processing_title">Processing your briefing…</string>
+    <string name="llm_processing_weighting">Weighting articles (%1$d / %2$d)</string>
+    <string name="llm_processing_summarising">Summarising articles (%1$d / %2$d)</string>
 </resources>
