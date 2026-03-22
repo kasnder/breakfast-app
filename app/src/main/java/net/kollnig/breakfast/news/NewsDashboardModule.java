@@ -365,6 +365,7 @@ public class NewsDashboardModule {
                 boolean llmFailed = false;
 
                 if (config.isOnDeviceLlmReady()) {
+                    final DashboardNotifier notifier = new DashboardNotifier(activity);
                     OnDeviceLlmClient onDevice = new OnDeviceLlmClient(
                             activity,
                             config.getOnDeviceModelPath(),
@@ -377,38 +378,50 @@ public class NewsDashboardModule {
                                     @Override
                                     public void onScoringStarted(int total) {
                                         mainThreadPoster.post(() -> {
-                                            newsStatus.setText(activity.getString(
-                                                    R.string.llm_processing_weighting, 0, total));
+                                            String phase = activity.getString(
+                                                    R.string.llm_processing_weighting, 0, total);
+                                            newsStatus.setText(phase);
                                             newsStatus.setVisibility(View.VISIBLE);
+                                            notifier.showProcessingNotification(phase, 0, total);
                                         });
                                     }
 
                                     @Override
                                     public void onArticleScored(int scored, int total) {
-                                        mainThreadPoster.post(() -> newsStatus.setText(
-                                                activity.getString(
-                                                        R.string.llm_processing_weighting,
-                                                        scored, total)));
+                                        mainThreadPoster.post(() -> {
+                                            String phase = activity.getString(
+                                                    R.string.llm_processing_weighting,
+                                                    scored, total);
+                                            newsStatus.setText(phase);
+                                            notifier.showProcessingNotification(phase, scored, total);
+                                        });
                                     }
 
                                     @Override
                                     public void onSummarizingStarted(int total) {
-                                        mainThreadPoster.post(() -> newsStatus.setText(
-                                                activity.getString(
-                                                        R.string.llm_processing_summarising,
-                                                        0, total)));
+                                        mainThreadPoster.post(() -> {
+                                            String phase = activity.getString(
+                                                    R.string.llm_processing_summarising,
+                                                    0, total);
+                                            newsStatus.setText(phase);
+                                            notifier.showProcessingNotification(phase, 0, total);
+                                        });
                                     }
 
                                     @Override
                                     public void onArticleSummarized(int summarized, int total) {
-                                        mainThreadPoster.post(() -> newsStatus.setText(
-                                                activity.getString(
-                                                        R.string.llm_processing_summarising,
-                                                        summarized, total)));
+                                        mainThreadPoster.post(() -> {
+                                            String phase = activity.getString(
+                                                    R.string.llm_processing_summarising,
+                                                    summarized, total);
+                                            newsStatus.setText(phase);
+                                            notifier.showProcessingNotification(phase, summarized, total);
+                                        });
                                     }
                                 });
                     } finally {
                         onDevice.close();
+                        notifier.cancelProcessingNotification();
                     }
                 } else {
                     LlmClient llm = new LlmClient(

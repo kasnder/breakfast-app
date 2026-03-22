@@ -83,7 +83,7 @@ public class DashboardNotifier {
                 .setProgress(indeterminate ? 0 : total, indeterminate ? 0 : current, indeterminate)
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
-                .setPriority(NotificationCompat.PRIORITY_LOW);
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT);
 
         notificationManager.notify(PROCESSING_NOTIFICATION_ID, builder.build());
     }
