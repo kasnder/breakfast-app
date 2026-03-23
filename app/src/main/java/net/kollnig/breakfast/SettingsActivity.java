@@ -21,7 +21,6 @@ import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.MenuItem;
 import android.view.View;
-import android.view.WindowInsetsController;
 import android.widget.CheckBox;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -96,6 +95,7 @@ public class SettingsActivity extends AppCompatActivity {
     private final Map<String, MaterialSwitch> moduleSwitches = new HashMap<>();
     private MaterialSwitch switchOnDeviceLlm;
     private MaterialSwitch switchOnDeviceGpu;
+    private MaterialSwitch switchOnDeviceBatching;
     private MaterialSwitch switchLlmBenchmark;
     private MaterialButton btnDownloadModel;
     private TextView textOnDeviceLlmStatus;
@@ -173,6 +173,7 @@ public class SettingsActivity extends AppCompatActivity {
         briefingOpenAiTtsText = findViewById(R.id.text_briefing_openai_tts);
         switchOnDeviceLlm = findViewById(R.id.switch_on_device_llm);
         switchOnDeviceGpu = findViewById(R.id.switch_on_device_gpu);
+        switchOnDeviceBatching = findViewById(R.id.switch_on_device_batching);
         switchLlmBenchmark = findViewById(R.id.switch_llm_benchmark);
         btnDownloadModel = findViewById(R.id.btn_download_model);
         textOnDeviceLlmStatus = findViewById(R.id.text_on_device_llm_status);
@@ -265,6 +266,8 @@ public class SettingsActivity extends AppCompatActivity {
         });
         switchOnDeviceGpu.setOnCheckedChangeListener((buttonView, isChecked) ->
                 config.setOnDeviceUseGpu(isChecked));
+        switchOnDeviceBatching.setOnCheckedChangeListener((buttonView, isChecked) ->
+                config.setOnDeviceBatchingEnabled(isChecked));
         switchLlmBenchmark.setOnCheckedChangeListener((buttonView, isChecked) ->
                 config.setLlmBenchmarkEnabled(isChecked));
         inputHuggingfaceToken.addTextChangedListener(new android.text.TextWatcher() {
@@ -309,6 +312,7 @@ public class SettingsActivity extends AppCompatActivity {
         switchBriefingOpenAiTts.setChecked(config.isBriefingUseOpenAiTtsEnabled());
         switchOnDeviceLlm.setChecked(config.isOnDeviceLlmEnabled());
         switchOnDeviceGpu.setChecked(config.isOnDeviceUseGpu());
+        switchOnDeviceBatching.setChecked(config.isOnDeviceBatchingEnabled());
         switchLlmBenchmark.setChecked(config.isLlmBenchmarkEnabled());
         inputHuggingfaceToken.setText(config.getHuggingFaceToken());
         String variant = config.getOnDeviceModelVariant();

@@ -68,14 +68,20 @@ public class OnDeviceLlmClient {
     private final Context context;
     private final String modelPath;
     private final boolean useGpu;
+    private final boolean batchingEnabled;
     private final boolean isE2B;
 
     private Engine engine;
 
     public OnDeviceLlmClient(Context context, String modelPath, boolean useGpu) {
+        this(context, modelPath, useGpu, true);
+    }
+
+    public OnDeviceLlmClient(Context context, String modelPath, boolean useGpu, boolean batchingEnabled) {
         this.context = context.getApplicationContext();
         this.modelPath = modelPath;
         this.useGpu = useGpu;
+        this.batchingEnabled = batchingEnabled;
         this.isE2B = modelPath != null && modelPath.toLowerCase().contains("e2b");
     }
 
@@ -200,8 +206,9 @@ public class OnDeviceLlmClient {
             long scoreStart = System.currentTimeMillis();
             int i = 0;
             while (i < maxArticles) {
-                int batchSize = computeBatchSize(interleaved, i, maxArticles,
-                        scoringContentBudget(interestProfile));
+                int batchSize = batchingEnabled 
+                        ? computeBatchSize(interleaved, i, maxArticles, scoringContentBudget(interestProfile))
+                        : 1;
                 List<ArticleData> batch = interleaved.subList(i, i + batchSize);
                 List<Float> scores = scoreArticlesBatch(batch, interestProfile);
                 for (int j = 0; j < scores.size(); j++) {
@@ -223,8 +230,9 @@ public class OnDeviceLlmClient {
             long sumStart = System.currentTimeMillis();
             int j = 0;
             while (j < topCount) {
-                int batchSize = computeBatchSizeFromScored(scored, j, topCount,
-                        summarizingContentBudget(topCount - j));
+                int batchSize = batchingEnabled
+                        ? computeBatchSizeFromScored(scored, j, topCount, summarizingContentBudget(topCount - j))
+                        : 1;
                 // Build a zero-copy view over the scored list instead of allocating a new list.
                 final int jOffset = j;
                 List<ArticleData> batch = new AbstractList<ArticleData>() {
