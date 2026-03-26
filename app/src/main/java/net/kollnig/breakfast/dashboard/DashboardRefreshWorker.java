@@ -160,6 +160,7 @@ public class DashboardRefreshWorker extends Worker {
     }
 
     private Result finishWork(AppConfig config, boolean refreshedAnything, List<String> refreshedModules, Context context) {
+        DashboardScheduler.scheduleMorningRefresh(context);
         if (!refreshedAnything) {
             return Result.success();
         }

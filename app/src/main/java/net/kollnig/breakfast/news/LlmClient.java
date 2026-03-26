@@ -16,7 +16,9 @@ import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import okhttp3.MediaType;
@@ -32,6 +34,10 @@ import okhttp3.Response;
 public class LlmClient {
     private static final String TAG = "LlmClient";
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
+    private static final int MAX_ARTICLES_PER_SOURCE_TO_RANK = 50;
+    private static final int DESCRIPTION_PROMPT_LIMIT = 200;
+    private static final double RANKING_TEMPERATURE = 0.3;
+    private static final double BRIEFING_TEMPERATURE = 0.4;
 
     private final OkHttpClient client;
     private final String baseUrl;
@@ -60,11 +66,11 @@ public class LlmClient {
         try {
             // Build the prompt
             StringBuilder articleList = new StringBuilder();
-            int maxArticles = Math.min(articles.size(), 30); // Don't send too many
-            for (int i = 0; i < maxArticles; i++) {
-                ArticleData a = articles.get(i);
+            List<ArticleData> candidateArticles = buildRankingPool(articles);
+            for (int i = 0; i < candidateArticles.size(); i++) {
+                ArticleData a = candidateArticles.get(i);
                 articleList.append(String.format("[%d] Title: %s\nDescription: %s\n\n",
-                        i, a.title, truncate(a.originalDescription, 200)));
+                        i, a.title, truncate(a.originalDescription, DESCRIPTION_PROMPT_LIMIT)));
             }
 
             String systemPrompt = "You are a personal news curator for the Breakfast morning newspaper app. " +
@@ -84,7 +90,7 @@ public class LlmClient {
             // Build the API request
             JSONObject requestBody = new JSONObject();
             requestBody.put("model", model);
-            requestBody.put("temperature", 0.3);
+            requestBody.put("temperature", RANKING_TEMPERATURE);
 
             JSONArray messages = new JSONArray();
             JSONObject sysMsg = new JSONObject();
@@ -139,8 +145,8 @@ public class LlmClient {
             for (int i = 0; i < rankedArray.length() && i < count; i++) {
                 JSONObject item = rankedArray.getJSONObject(i);
                 int index = item.getInt("index");
-                if (index >= 0 && index < articles.size()) {
-                    ArticleData article = articles.get(index);
+                if (index >= 0 && index < candidateArticles.size()) {
+                    ArticleData article = candidateArticles.get(index);
                     article.interestScore = (float) item.getDouble("score");
                     article.llmSummary = item.getString("summary");
                     result.add(article);
@@ -181,7 +187,7 @@ public class LlmClient {
 
             JSONObject requestBody = new JSONObject();
             requestBody.put("model", model);
-            requestBody.put("temperature", 0.4);
+            requestBody.put("temperature", BRIEFING_TEMPERATURE);
 
             JSONArray messages = new JSONArray();
             JSONObject sysMsg = new JSONObject();
@@ -235,6 +241,36 @@ public class LlmClient {
             top.add(sorted.get(i));
         }
         return top;
+    }
+
+    private List<ArticleData> buildRankingPool(List<ArticleData> articles) {
+        Map<String, List<ArticleData>> bySource = new LinkedHashMap<>();
+        for (ArticleData article : articles) {
+            String key = article.sourceFeedUrl != null ? article.sourceFeedUrl : "";
+            List<ArticleData> bucket = bySource.computeIfAbsent(key, k -> new ArrayList<>());
+            if (bucket.size() < MAX_ARTICLES_PER_SOURCE_TO_RANK) {
+                bucket.add(article);
+            }
+        }
+        if (bySource.size() <= 1) {
+            return new ArrayList<>(articles.subList(0,
+                    Math.min(articles.size(), MAX_ARTICLES_PER_SOURCE_TO_RANK)));
+        }
+
+        List<List<ArticleData>> buckets = new ArrayList<>(bySource.values());
+        List<ArticleData> result = new ArrayList<>();
+        int maxBucketSize = 0;
+        for (List<ArticleData> bucket : buckets) {
+            if (bucket.size() > maxBucketSize) maxBucketSize = bucket.size();
+        }
+        for (int i = 0; i < maxBucketSize; i++) {
+            for (List<ArticleData> bucket : buckets) {
+                if (i < bucket.size()) {
+                    result.add(bucket.get(i));
+                }
+            }
+        }
+        return result;
     }
 
     private String truncate(String text, int maxLen) {

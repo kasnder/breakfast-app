@@ -45,8 +45,10 @@ public class OnDeviceLlmClient {
 
     /** Tokens reserved for the system prompt in a scoring call. */
     private static final int SCORING_SYSTEM_PROMPT_TOKENS = 80;
-    /** Maximum number of articles scored per {@link #rankAndSummarize} invocation. */
-    private static final int MAX_ARTICLES_TO_SCORE = 30;
+    /** Maximum number of recent articles per source considered for scoring. */
+    private static final int MAX_ARTICLES_PER_SOURCE_TO_SCORE = 50;
+    /** Conservative upper bound for how many score lines one batch is allowed to emit. */
+    private static final int MAX_SCORES_PER_BATCH = 50;
     /** Output tokens per scored article ("N: 0.85\n" ≈ 4–5 tokens; 8 gives headroom). */
     private static final int OUTPUT_TOKENS_PER_SCORE = 8;
     /** Framing/instruction overhead tokens reserved in a scoring call. */
@@ -58,6 +60,8 @@ public class OnDeviceLlmClient {
     private static final int OUTPUT_TOKENS_PER_SUMMARY = 55;
     /** Framing/instruction overhead tokens reserved in a summarising call. */
     private static final int SUMMARISING_FRAMING_TOKENS = 30;
+    /** Output budget for the spoken morning briefing script. */
+    private static final int OUTPUT_TOKENS_FOR_BRIEFING = 320;
 
     /**
      * Characters of fixed formatting per article inside a batch prompt
@@ -196,8 +200,8 @@ public class OnDeviceLlmClient {
         try {
             // Interleave articles across feed sources so every source gets fair representation
             // before the scoring cap is applied.
-            List<ArticleData> interleaved = interleaveBySource(articles);
-            int maxArticles = Math.min(interleaved.size(), MAX_ARTICLES_TO_SCORE);
+            List<ArticleData> scoringPool = buildScoringPool(articles);
+            int maxArticles = scoringPool.size();
 
             // Step 1: Score articles for relevance in batches (fewer LLM calls).
             List<ScoredArticle> scored = new ArrayList<>();
@@ -207,9 +211,9 @@ public class OnDeviceLlmClient {
             int i = 0;
             while (i < maxArticles) {
                 int batchSize = batchingEnabled 
-                        ? computeBatchSize(interleaved, i, maxArticles, scoringContentBudget(interestProfile))
+                        ? computeBatchSize(scoringPool, i, maxArticles, scoringContentBudget(interestProfile))
                         : 1;
-                List<ArticleData> batch = interleaved.subList(i, i + batchSize);
+                List<ArticleData> batch = scoringPool.subList(i, i + batchSize);
                 List<Float> scores = scoreArticlesBatch(batch, interestProfile);
                 for (int j = 0; j < scores.size(); j++) {
                     scored.add(new ScoredArticle(batch.get(j), scores.get(j)));
@@ -217,7 +221,7 @@ public class OnDeviceLlmClient {
                 }
                 i += batchSize;
             }
-            Log.i(TAG, "Scoring " + maxArticles + " articles took "
+            Log.i(TAG, "Scoring " + maxArticles + " candidate articles took "
                     + (System.currentTimeMillis() - scoreStart) + " ms");
 
             // Sort by score descending
@@ -264,21 +268,26 @@ public class OnDeviceLlmClient {
     }
 
     /**
-     * Interleaves articles from different feed sources in a round-robin fashion so that no
-     * single source dominates the articles that make it past the scoring-count cap.
+     * Keeps up to {@link #MAX_ARTICLES_PER_SOURCE_TO_SCORE} recent items per source, then
+     * interleaves them in round-robin order so no single source dominates the scoring queue.
      * The relative order within each source is preserved (newest-first as they come from
      * the fetcher).
      */
-    private List<ArticleData> interleaveBySource(List<ArticleData> articles) {
-        // Group by source feed URL, preserving insertion order.
+    private List<ArticleData> buildScoringPool(List<ArticleData> articles) {
         Map<String, List<ArticleData>> bySource = new LinkedHashMap<>();
         for (ArticleData article : articles) {
             String key = article.sourceFeedUrl != null ? article.sourceFeedUrl : "";
-            bySource.computeIfAbsent(key, k -> new ArrayList<>()).add(article);
+            List<ArticleData> bucket = bySource.computeIfAbsent(key, k -> new ArrayList<>());
+            if (bucket.size() < MAX_ARTICLES_PER_SOURCE_TO_SCORE) {
+                bucket.add(article);
+            }
         }
         if (bySource.size() <= 1) {
-            // Only one source (or no source info) – no interleaving needed.
-            return articles;
+            String onlyKey = bySource.isEmpty() ? null : bySource.keySet().iterator().next();
+            if (onlyKey == null) {
+                return new ArrayList<>();
+            }
+            return bySource.get(onlyKey);
         }
         List<List<ArticleData>> buckets = new ArrayList<>(bySource.values());
         List<ArticleData> result = new ArrayList<>(articles.size());
@@ -321,10 +330,11 @@ public class OnDeviceLlmClient {
         }
 
         try {
-            String systemPrompt = "You are a relevance scorer. "
-                    + "Given user interests and a numbered list of articles, respond with ONLY "
-                    + "a numbered list of relevance scores from 0.0 to 1.0, one per line in the "
-                    + "format \"N: score\" (example: \"1: 0.85\"). Nothing else.";
+            String systemPrompt = "You score how relevant news articles are to the user's interests. "
+                    + "Return exactly one score for each article in the same order as the input. "
+                    + "Use ONLY one line per article in the format \"N: score\" where N is the "
+                    + "article number and score is between 0.0 and 1.0. "
+                    + "Do not skip items. Do not add explanations.";
 
             StringBuilder userPrompt = new StringBuilder();
             userPrompt.append("User interests: ")
@@ -338,10 +348,12 @@ public class OnDeviceLlmClient {
                           .append(truncate(a.originalDescription, descLimit()))
                           .append("\n\n");
             }
-            userPrompt.append("Relevance scores (0.0-1.0):");
+            userPrompt.append("Return ").append(batch.size())
+                      .append(" lines, one for each article, in order.\n")
+                      .append("Relevance scores (0.0-1.0):");
 
             int maxOutputTokens = batch.size() * OUTPUT_TOKENS_PER_SCORE;
-            SamplerConfig samplerConfig = new SamplerConfig(maxOutputTokens, 1.0, 0.0, 0);
+            SamplerConfig samplerConfig = new SamplerConfig(maxOutputTokens, 0.0, 1.0, 0);
             ConversationConfig convConfig = new ConversationConfig(
                     Contents.Companion.of(systemPrompt),
                     Collections.emptyList(),
@@ -442,7 +454,7 @@ public class OnDeviceLlmClient {
                     + "\nArticle description: " + truncate(article.originalDescription, descLimit())
                     + "\n\nRelevance score (0.0-1.0):";
 
-            SamplerConfig samplerConfig = new SamplerConfig(OUTPUT_TOKENS_PER_SCORE, 1.0, 0.0, 0);
+            SamplerConfig samplerConfig = new SamplerConfig(OUTPUT_TOKENS_PER_SCORE, 0.0, 1.0, 0);
             ConversationConfig convConfig = new ConversationConfig(
                     Contents.Companion.of(systemPrompt),
                     Collections.emptyList(),
@@ -487,9 +499,10 @@ public class OnDeviceLlmClient {
 
         try {
             String systemPrompt = "You are a concise news summarizer. "
-                    + "For each numbered article, write a 1-2 sentence factual summary. "
-                    + "Respond with ONLY a numbered list in the format \"N: summary\" "
-                    + "(example: \"1: Scientists discover…\"). Nothing else.";
+                    + "For each numbered article, write a factual 1-2 sentence summary. "
+                    + "Return exactly one summary for each article in the same order as the input. "
+                    + "Use ONLY the format \"N: summary\". "
+                    + "Do not skip items. Do not add explanations or markdown.";
 
             StringBuilder userPrompt = new StringBuilder("Articles:\n");
             for (int i = 0; i < batch.size(); i++) {
@@ -500,10 +513,12 @@ public class OnDeviceLlmClient {
                           .append(truncate(a.originalDescription, descLimit()))
                           .append("\n\n");
             }
-            userPrompt.append("Summaries:");
+            userPrompt.append("Return ").append(batch.size())
+                      .append(" numbered summaries, one per article, in order.\n")
+                      .append("Summaries:");
 
             int maxOutputTokens = batch.size() * OUTPUT_TOKENS_PER_SUMMARY;
-            SamplerConfig samplerConfig = new SamplerConfig(maxOutputTokens, 0.95, 0.2, 0);
+            SamplerConfig samplerConfig = new SamplerConfig(maxOutputTokens, 0.2, 0.95, 0);
             ConversationConfig convConfig = new ConversationConfig(
                     Contents.Companion.of(systemPrompt),
                     Collections.emptyList(),
@@ -599,7 +614,7 @@ public class OnDeviceLlmClient {
                     + "\nDescription: " + truncate(article.originalDescription, descLimit())
                     + "\n\nSummary:";
 
-            SamplerConfig samplerConfig = new SamplerConfig(40, 0.95, 0.2, 0);
+            SamplerConfig samplerConfig = new SamplerConfig(48, 0.2, 0.95, 0);
             ConversationConfig convConfig = new ConversationConfig(
                     Contents.Companion.of(systemPrompt),
                     Collections.emptyList(),
@@ -644,7 +659,7 @@ public class OnDeviceLlmClient {
             String userPrompt = "Dashboard data:\n\n" + trimmedData
                     + "\n\nWrite a brief spoken morning briefing script:";
 
-            SamplerConfig samplerConfig = new SamplerConfig(40, 0.95, 0.7, 0);
+            SamplerConfig samplerConfig = new SamplerConfig(OUTPUT_TOKENS_FOR_BRIEFING, 0.4, 0.95, 0);
             ConversationConfig convConfig = new ConversationConfig(
                     Contents.Companion.of(systemPrompt),
                     Collections.emptyList(),
@@ -752,14 +767,14 @@ public class OnDeviceLlmClient {
 
     /**
      * Character budget available for article content in a scoring call.
-     * Reserves tokens for: system prompt, interest profile, output (up to
-     * {@link #MAX_ARTICLES_TO_SCORE} × {@link #OUTPUT_TOKENS_PER_SCORE}), and framing.
+     * Reserves tokens for: system prompt, interest profile, output buffer for one batch,
+     * and framing.
      */
     private int scoringContentBudget(String interestProfile) {
         int interestTokens = (interestProfile != null
                 ? Math.min(interestProfile.length(), interestLimit()) : 0) / CHARS_PER_TOKEN;
         int reserveTokens = SCORING_SYSTEM_PROMPT_TOKENS + interestTokens
-                + MAX_ARTICLES_TO_SCORE * OUTPUT_TOKENS_PER_SCORE + SCORING_FRAMING_TOKENS;
+                + MAX_SCORES_PER_BATCH * OUTPUT_TOKENS_PER_SCORE + SCORING_FRAMING_TOKENS;
         return Math.max(0, (CONTEXT_TOKENS - reserveTokens) * CHARS_PER_TOKEN);
     }
 
