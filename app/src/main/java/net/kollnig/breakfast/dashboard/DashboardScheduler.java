@@ -12,7 +12,6 @@ import android.content.Context;
 
 import androidx.work.ExistingWorkPolicy;
 import androidx.work.OneTimeWorkRequest;
-import androidx.work.ExistingPeriodicWorkPolicy;
 import androidx.work.PeriodicWorkRequest;
 import androidx.work.WorkManager;
 
@@ -29,15 +28,13 @@ public final class DashboardScheduler {
     public static void scheduleMorningRefresh(Context context) {
         AppConfig config = new AppConfig(context);
         long initialDelay = computeInitialDelayMs(config.getMorningRefreshHour(), config.getMorningRefreshMinute());
-        PeriodicWorkRequest request = new PeriodicWorkRequest.Builder(
-                DashboardRefreshWorker.class,
-                24,
-                TimeUnit.HOURS
-        ).setInitialDelay(initialDelay, TimeUnit.MILLISECONDS).build();
+        OneTimeWorkRequest request = new OneTimeWorkRequest.Builder(DashboardRefreshWorker.class)
+                .setInitialDelay(initialDelay, TimeUnit.MILLISECONDS)
+                .build();
 
-        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+        WorkManager.getInstance(context).enqueueUniqueWork(
                 MORNING_WORK_NAME,
-                ExistingPeriodicWorkPolicy.CANCEL_AND_REENQUEUE,
+                ExistingWorkPolicy.REPLACE,
                 request
         );
 
@@ -64,7 +61,7 @@ public final class DashboardScheduler {
 
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
                 HEADLINE_WORK_NAME,
-                ExistingPeriodicWorkPolicy.UPDATE,
+                androidx.work.ExistingPeriodicWorkPolicy.UPDATE,
                 request
         );
     }

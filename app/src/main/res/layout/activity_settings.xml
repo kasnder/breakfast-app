@@ -495,6 +495,13 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Use GPU acceleration"
+                android:layout_marginBottom="4dp" />
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/switch_on_device_batching"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Enable prompt batching"
                 android:layout_marginBottom="16dp" />
 
             <com.google.android.material.textfield.TextInputLayout

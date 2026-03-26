@@ -81,17 +81,57 @@ public class DashboardRefreshWorker extends Worker {
                 if (config.isTopStoriesAvailable()) {
                     try {
                         if (config.isOnDeviceLlmReady()) {
+                            final DashboardNotifier notifier = new DashboardNotifier(context);
                             OnDeviceLlmClient onDevice = new OnDeviceLlmClient(
                                     context,
                                     config.getOnDeviceModelPath(),
-                                    config.isOnDeviceUseGpu());
+                                    config.isOnDeviceUseGpu(),
+                                    config.isOnDeviceBatchingEnabled());
                             try {
                                 onDevice.initialize();
                                 topArticles = onDevice.rankAndSummarize(
                                         allArticles,
                                         config.getInterestProfile(),
-                                        config.getArticleCount());
+                                        config.getArticleCount(),
+                                        new OnDeviceLlmClient.ProgressListener() {
+                                            @Override
+                                            public void onScoringStarted(int total) {
+                                                notifier.showProcessingNotification(
+                                                        context.getString(
+                                                                R.string.llm_processing_weighting,
+                                                                0, total),
+                                                        0, total);
+                                            }
+
+                                            @Override
+                                            public void onArticleScored(int scored, int total) {
+                                                notifier.showProcessingNotification(
+                                                        context.getString(
+                                                                R.string.llm_processing_weighting,
+                                                                scored, total),
+                                                        scored, total);
+                                            }
+
+                                            @Override
+                                            public void onSummarizingStarted(int total) {
+                                                notifier.showProcessingNotification(
+                                                        context.getString(
+                                                                R.string.llm_processing_summarising,
+                                                                0, total),
+                                                        0, total);
+                                            }
+
+                                            @Override
+                                            public void onArticleSummarized(int summarized, int total) {
+                                                notifier.showProcessingNotification(
+                                                        context.getString(
+                                                                R.string.llm_processing_summarising,
+                                                                summarized, total),
+                                                        summarized, total);
+                                            }
+                                        });
                             } finally {
+                                notifier.cancelProcessingNotification();
                                 onDevice.close();
                             }
                         } else {
@@ -120,6 +160,7 @@ public class DashboardRefreshWorker extends Worker {
     }
 
     private Result finishWork(AppConfig config, boolean refreshedAnything, List<String> refreshedModules, Context context) {
+        DashboardScheduler.scheduleMorningRefresh(context);
         if (!refreshedAnything) {
             return Result.success();
         }
