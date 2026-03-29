@@ -85,15 +85,20 @@ The current Gradle setup expects that library as a local sibling project:
 Basic local setup:
 
 1. Clone this repository.
-2. Clone [kasnder/redd-focus-android](https://github.com/kasnder/redd-focus-android) so its `distractionlib` module is available as a sibling directory.
-3. Either place that checkout where this project expects it, or update `settings.gradle` to point `project(':distractionlib').projectDir` at your local `distractionlib` path.
-4. Open the project in Android Studio or build from the command line.
+2. Clone [kasnder/redd-focus-android](https://github.com/kasnder/redd-focus-android) next to it as `GreaseMilkyway`. The `settings.gradle` in this project expects `distractionlib` at `../GreaseMilkyway/distractionlib` relative to the Breakfast project root.
+3. Open the project in Android Studio or build from the command line.
+
+If you clone `redd-focus-android` under a different name or path, update the `projectDir` line in `settings.gradle` to match:
+
+```groovy
+project(':distractionlib').projectDir = new File(settingsDir, '../YourPath/distractionlib')
+```
 
 Example:
 
 ```bash
-git clone <this-repo>
-git clone https://github.com/kasnder/redd-focus-android ../GreaseMilkyway
+git clone https://github.com/kasnder/breakfast-app
+git clone https://github.com/kasnder/redd-focus-android GreaseMilkyway
 cd breakfast-app
 ./gradlew assembleDebug
 ```
