@@ -49,21 +49,21 @@ public class DashboardRefreshWorker extends Worker {
                 int refreshHour = config.getMorningRefreshHour();
                 int refreshMinute = config.getMorningRefreshMinute();
                 List<ArticleData> headlineArticles = new RssFetcher().fetchAllFeeds(headlineFeeds);
-                List<ArticleData> headlinePool = NewsCache.mergeSinceWindowStart(
+                List<ArticleData> headlinePool = NewsCache.mergeRollingWindow(
                         config.getCachedHeadlinePool(),
                         headlineArticles,
-                        now,
-                        refreshHour,
-                        refreshMinute
+                        now
                 );
                 config.setCachedHeadlinePool(headlinePool);
-                config.setCachedHeadlines(NewsCache.snapshotSinceWindowStart(
+                long currentDeliveryWindowStart = NewsCache.computeWindowStart(
+                        now, refreshHour, refreshMinute);
+                config.setCachedHeadlines(NewsCache.snapshotForDeliveryWindow(
                         headlinePool,
                         now,
                         refreshHour,
                         refreshMinute
                 ));
-                config.setHeadlinesLastRefresh(now);
+                config.setHeadlinesLastRefresh(currentDeliveryWindowStart);
                 refreshedAnything = true;
             }
 
