@@ -276,8 +276,10 @@ public class NewsDashboardModule {
                         refreshMinute
                 );
                 List<ArticleData> displayArticles;
-                if (config.getHeadlinesLastRefresh() < currentDeliveryWindowStart) {
-                    displayArticles = NewsCache.snapshotForDeliveryWindow(
+                boolean newWindow = config.getHeadlinesLastRefresh() < currentDeliveryWindowStart;
+                boolean cacheEmpty = config.getCachedHeadlines().isEmpty();
+                if (newWindow || cacheEmpty) {
+                    displayArticles = NewsCache.snapshotSinceWindowStart(
                             headlinePool,
                             now,
                             refreshHour,

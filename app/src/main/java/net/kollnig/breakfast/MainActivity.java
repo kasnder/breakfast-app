@@ -211,6 +211,13 @@ public class MainActivity extends AppCompatActivity {
 
         newsModule.loadCachedHeadlines();
         newsModule.loadCachedArticles();
+
+        // If headlines cache is empty but feeds are configured, fetch live data
+        if (config.isNewsModuleEnabled()
+                && config.getCachedHeadlines().isEmpty()
+                && !config.getEffectiveHeadlineFeedUrls().isEmpty()) {
+            newsModule.loadHeadlines();
+        }
     }
 
     @Override
