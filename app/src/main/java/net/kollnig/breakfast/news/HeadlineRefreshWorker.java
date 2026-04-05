@@ -42,8 +42,10 @@ public class HeadlineRefreshWorker extends Worker {
         );
         config.setCachedHeadlinePool(merged);
         long currentDeliveryWindowStart = NewsCache.computeWindowStart(now, refreshHour, refreshMinute);
-        if (config.getHeadlinesLastRefresh() < currentDeliveryWindowStart) {
-            config.setCachedHeadlines(NewsCache.snapshotForDeliveryWindow(
+        boolean newWindow = config.getHeadlinesLastRefresh() < currentDeliveryWindowStart;
+        boolean cacheEmpty = config.getCachedHeadlines().isEmpty();
+        if (newWindow || cacheEmpty) {
+            config.setCachedHeadlines(NewsCache.snapshotSinceWindowStart(
                     merged,
                     now,
                     refreshHour,
